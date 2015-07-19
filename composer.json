@@ -1,0 +1,29 @@
+{
+    "name": "chansig/router",
+    "description": "PHP Router for PHP5.4+ Built-in Server",
+    "keywords": [
+        "router",
+        "server",
+        "symfony",
+        "wordpress"
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/Chansig/Router",
+    "authors": [
+        {
+            "name": "Chansig",
+            "email": "chansig@chansig.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.4.0"
+    },
+    "autoload": {
+        "psr-4": {"Chansig\\Router\\": ""}
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0.x-dev"
+        }
+    }
+}
