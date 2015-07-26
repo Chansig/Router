@@ -40,33 +40,33 @@ You can then later update Chansig/Router using composer:
 
 ## Run PHP Built-in Server
 
-    php -S <addr>:<port> -t <docroot> vendor/chansig/router/router.php
+    php -S <addr>:<port> -t <docroot> vendor/chansig/router/src/router.php
 
 ex:
-    php -S localhost:80 vendor/chansig/router/router.php
+    php -S localhost:80 vendor/chansig/router/src/router.php
 
 ex on Symfony:
 
-    php -S 127.0.0.1:8080 -t web vendor/chansig/router/router_symfony_dev.php
+    php -S 127.0.0.1:8080 -t web vendor/chansig/src/router/router_symfony_dev.php
   
 ex on Wordpress:
 
-    php -S localhost:81 -t wordpress vendor/chansig/router/router.php
+    php -S localhost:81 -t wordpress vendor/chansig/src/router/router.php
 
 ## Using Symfony console
 
-    app/console server:run 127.0.0.1:80 --router=vendor/chansig/router/router_symfony_dev.php --docroot=web
+    app/console server:run 127.0.0.1:80 --router=vendor/chansig/src/router/router_symfony_dev.php --docroot=web
     
 ## php.ini
 
 override ini values
 
-     php -S localhost:81 -t wordpress -c vendor/chansig/router/router.ini vendor/chansig/router/router.php
+     php -S localhost:81 -t wordpress -c vendor/chansig/src/router/router.ini vendor/chansig/src/router/router.php
      php -S localhost:81 -t wordpress -c my.ini router.php
 
 ## Configuration
 
-- copy vendor/chansig/router/router.php in your main directory
+- copy vendor/chansig/src/router/router.php in your main directory
 - require Composer's autoloader in router.php:
 
         #router.php
@@ -75,7 +75,7 @@ override ini values
 
 ### Override configuration
 
-- copy vendor/chansig/router/router.json in your main directory
+- copy vendor/chansig/src/router/router.json in your main directory
 
 Set configuration values in router.json:
 
