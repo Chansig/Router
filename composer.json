@@ -19,7 +19,7 @@
         "php": ">=5.4.0"
     },
     "autoload": {
-        "psr-4": {"Chansig\\Router\\": ""}
+        "psr-4": {"Chansig\\Router\\": "src/"}
     },
     "extra": {
         "branch-alias": {

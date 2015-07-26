@@ -11,60 +11,102 @@ class PhpRouter
 {
 
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.1';
+    const VERSION = '0.2';
     /**
      * @var array
      */
     protected $config = [
+        "hosts-name" => [],
+        "docroot" => null,
         "directory-index" => "index.php",
-        "allowed-hosts" => [],
         "allow-origin" => false,
         "handle-404" => false,
         "cache" => 0,
-        "log" => true
+        "log" => true,
+        "log-dir" => null,
+        "vhosts" => []
     ];
-    /**
-     * @var array
-     */
-    protected $supportedMime = [];
+
     /**
      * @var string
      */
     protected $extension = '';
+
     /**
      * @var string
      */
-    protected $filename = '';
+    protected $scriptFilename = '';
+
+    /**
+     * @var string
+     */
+    protected $host = '';
 
     /**
      * @param $config
      */
     public function __construct($config = [])
     {
-
-        if (ini_get('auto_prepend_file') && !in_array(realpath(ini_get('auto_prepend_file')), get_included_files(), true)) {
-            include ini_get('auto_prepend_file');
+        if (null === $config) {
+            throw new \Exception('Invalid configuraion. Check your router.json syntax.');
         }
         $this->config = array_merge($this->config, $config);
+        $this->host = explode(':', $_SERVER['HTTP_HOST'])[0];
         $path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
-        $this->filename = substr($_SERVER['SCRIPT_FILENAME'], strlen($_SERVER['DOCUMENT_ROOT']) + 1);
         $this->extension = pathinfo($path, PATHINFO_EXTENSION);
-        $this->supportedMime = $this->getSupportedMime();
+
+        if (!empty($this->config['vhosts'])) {
+            foreach ($this->config['vhosts'] as $vhost) {
+                if (in_array($this->host, $vhost['hosts-name'])) {
+                    $this->config = array_merge($this->config, $vhost);
+                    break;
+                }
+            }
+        }
+        if (!is_null($this->config['docroot']) && !is_dir($this->config['docroot'])) {
+            throw new \Exception('Invalid docroot. Check your router.json syntax.');
+        }
+        if (!is_null($this->config['log-dir']) && !is_dir($this->config['log-dir'])) {
+            throw new \Exception(sprintf('%s is not a valid log-dir. Check your router.json syntax.', $this->config['log-dir']));
+        }
+        if (!is_null($this->config['docroot'])) {
+            $_SERVER['DOCUMENT_ROOT'] = $this->config['docroot'];
+        }
+        $this->scriptFilename = $_SERVER['DOCUMENT_ROOT'] . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
+        $_SERVER['SCRIPT_FILENAME'] = $this->scriptFilename;
+        $GLOBALS['_SERVER'] = $_SERVER;
     }
 
     /**
-     * 1/ No extension  => SCRIPT_FILENAME = index.php
-     * 2/ exist.php =>  SCRIPT_FILENAME = exist.php
-     * 3/ notexist.php =>  SCRIPT_FILENAME = router.php
-     * 4/ asset.ext =>  SCRIPT_FILENAME = router.php
-     *
+     * @return bool|string
+     */
+    public function prepend()
+    {
+        if (ini_get('auto_prepend_file') && !in_array(realpath(ini_get('auto_prepend_file')), get_included_files(), true)) {
+            return ini_get('auto_prepend_file');
+        }
+        return false;
+    }
+
+    /**
+     * @return bool|string
+     */
+    public function append()
+    {
+        if (ini_get('auto_append_file') && !in_array(realpath(ini_get('auto_append_file')), get_included_files(), true)) {
+            return ini_get('auto_append_file');
+        }
+        return false;
+    }
+
+    /**
      * @return bool
      */
     public function run()
     {
         header(sprintf('X-Router: %s %s', static::VENDOR_NAME, static::VERSION));
-        if (!empty($this->config['allowed-hosts'])) {
-            if (!in_array($_SERVER['REMOTE_ADDR'], $this->config['allowed-hosts'])) {
+        if (!empty($this->config['hosts-name'])) {
+            if (!in_array($this->host, $this->config['hosts-name']) && !in_array($_SERVER['REMOTE_ADDR'], $this->config['hosts-name'])) {
                 return $this->error(403);
             }
         }
@@ -73,11 +115,11 @@ class PhpRouter
             return false;
         }
 
-        if (is_file($_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $_SERVER['SCRIPT_NAME'])) {
+        if (is_file($this->scriptFilename)) {
             header(sprintf('X-Router-file: %s', $_SERVER['SCRIPT_NAME']));
-            // execute php files
             if ('php' === $this->extension) {
-                return false;
+                chdir(dirname($this->scriptFilename));
+                return $this->scriptFilename;
             }
             return $this->executeKnownFile();
         } else {
@@ -116,7 +158,7 @@ class PhpRouter
     protected function executeKnownFile()
     {
         $this->logAccess('200');
-        if (in_array($this->extension, $this->supportedMime) && !$this->config['allow-origin'] && 0 === $this->config['cache']) {
+        if (in_array($this->extension, $this->getSupportedMime()) && !$this->config['allow-origin'] && 0 === $this->config['cache']) {
             return false;
         } elseif (array_key_exists($this->extension, $this->getMimeTypes())) {
             $types = $this->getMimeTypes()[$this->extension];
@@ -132,7 +174,7 @@ class PhpRouter
             if (!is_null($this->config['cache'])) {
                 header(sprintf('Cache-Control: public, max-age=%1$d', $this->config['cache']));
             }
-            readfile($_SERVER['SCRIPT_FILENAME']);
+            readfile($this->scriptFilename);
             exit;
         }
         return false;
@@ -289,7 +331,7 @@ class PhpRouter
             header("HTTP/1.0 404 Not Found");
             $status = 'Not Found';
         }
-        echo sprintf('<!doctype html><html><head><title>%1$s %2$s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%2$s</h1><p>The requested resource <strong>%4$s</strong> was %3$s on this server.</p><hr /><p>%5$s %6$s</p></body></html>', $error, $status, strtolower($status), $_SERVER['REQUEST_URI'], static::VENDOR_NAME, static::VERSION);
+        echo sprintf('<!doctype html><html><head><title>%1$s %2$s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%2$s</h1><p>The requested resource <strong>%4$s</strong> was %3$s on this server.</p><hr /><p>%5$s %6$s</p><hr/>Chansig/Router</body></html>', $error, $status, strtolower($status), $_SERVER['REQUEST_URI'], static::VENDOR_NAME, static::VERSION);
         return true;
     }
 
@@ -300,7 +342,13 @@ class PhpRouter
     {
         if ($this->config['log']) {
             $now = new \DateTime('now', new \DateTimeZone('UTC'));
-            file_put_contents("php://stdout", sprintf("[%s] %s:%s [%s]: %s\n", $now->format("D M j H:i:s Y"), $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $status, $_SERVER["REQUEST_URI"]));
+            $log = sprintf("[%s] %s:%s [%s]: %s\n", $now->format("D M j H:i:s Y"), $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $status, $_SERVER["REQUEST_URI"]);
+
+            file_put_contents("php://stdout", $log);
+            if (!is_null($this->config['log-dir'])) {
+                $filename = sprintf('%s%srouter-access-%s.log', $this->config['log-dir'], DIRECTORY_SEPARATOR, $this->host);
+                error_log($log, 3, $filename);
+            }
         }
     }
 }

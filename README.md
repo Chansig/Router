@@ -8,7 +8,8 @@ Works fine in Wordpress, Symfony 2, etc.
 
 ## Features
 
-- Specific directory index (app_dev.php for example)
+- Serve multiple domains with vhosts configuration
+- Allow different directory index (app_dev.php for example)
 - Allowed Hosts only
 - Header Cache control
 - Header Access-Control-Allow-Origin
@@ -31,7 +32,7 @@ The recommended way to install Chansig/Router is through
 
 Next, run the Composer command to install the latest stable version of Chansig/Router:
 
-    composer.phar require chansig/router
+    composer.phar require chansig/router dev-master
 
 You can then later update Chansig/Router using composer:
 
@@ -40,9 +41,9 @@ You can then later update Chansig/Router using composer:
 ## Run PHP Built-in Server
 
     php -S <addr>:<port> -t <docroot> vendor/chansig/router/router.php
-ex:
 
-    php -S localhost:81 vendor/chansig/router/router.php
+ex:
+    php -S localhost:80 vendor/chansig/router/router.php
 
 ex on Symfony:
 
@@ -62,28 +63,114 @@ override ini values
 
      php -S localhost:81 -t wordpress -c vendor/chansig/router/router.ini vendor/chansig/router/router.php
      php -S localhost:81 -t wordpress -c my.ini router.php
-    
-## Specific configuration
 
-- copy vendor/chansig/router/router.php.dist in your main directory
-- rename router.php.dist to router.php
+## Configuration
+
+- copy vendor/chansig/router/router.php in your main directory
 - require Composer's autoloader in router.php:
 
         #router.php
         require 'vendor/autoload.php';
         
-- change config values in router.php if needed:
 
-        #router.php
-        $config = [
-            "directory-index" => "index.php", # Directory index filename.
-            "allowed-hosts" => [], # List of allowed hosts if not empty.
-            "allow-origin" => true, # Send Header Access-Control-Allow-Origin: *. Useful for fonts files required on local CDN.
-            "handle-404" => false, # Server handles 404 error page.
-            "cache" => 0, # Send http cache headers if > 0. Ex: Cache-Control: public, max-age=300
-            "log" => true # Write access logs to output
-        ];
-        return (new Chansig\Router\PhpRouter($config))->run();
+### Override configuration
+
+- copy vendor/chansig/router/router.json in your main directory
+
+Set configuration values in router.json:
+
+       
+-   "hosts-name"  
+    @var string[] []  
+    List of allowed hosts if not empty.
+
+-   "docroot"  
+    @var null|string null  
+    Override Server DOCUMENT_ROOT if not null  
+
+-   "directory-index"  
+    @var string "index.php"  
+    Directory index filename.
+
+-  "allow-origin"  
+    @var bool true  
+    Send Header Access-Control-Allow-Origin: *.  
+    Useful for fonts files required on local CDN.  
+        
+-   "handle-404"  
+    @var bool false  
+    Router handles 404 error page.  
+    
+-   "cache"
+    @var int 0  
+    Send http cache headers if > 0. Ex: Cache-Control: public, max-age=300  
+
+-   "log"  
+    @var bool true
+    Send access logs to output if true
+    
+-   "log-dir"  
+    @var null|string  null
+    Write access logs to log-dir if not null  
+    
+-   "vhosts"  
+    @var object  
+    list of virtual hosts.  
+    You must define server(s) name and document root for each vhost.  
+    Configuration is the same as the global configuration.  
+    Vhost configuration is merged into global configuration.  
+    
+    ex:  
+        
+        #router.json
+        {
+            "hosts-name":  [],
+            "docroot": null,
+            "directory-index": "index.php",
+            "allow-origin":  false,
+            "handle-404":  false,
+            "cache":  0,
+            "log":  true,
+            "log-dir":  null,
+            "vhosts":{
+                "serverkey1": {
+                    "hosts-name": ["dev.mysite.ltd", "dev.www.mysite.ltd"],
+                    "docroot": "/var/www/www.mysite.tld",
+                    "directory-index": "mydirectoryindex.php",
+                    "log-dir": "/var/log/php/mysite.ltd",
+                },
+                "serverkey1": {
+                    "hosts-name": ["cdn.dev.mysite.ltd""],
+                    "docroot": "/var/www/www.mysite.tld",
+                    "directory-index": "mydirectoryindex.php",
+                    "allow-origin": true,
+                    "cache": 43200,
+                    "handle-404": true,
+                    "log": false
+                }
+            }
+        }
+        
+You can skip default configuration:  
+For exemple, sf2 site on windows:
+
+    #router.json
+            {
+                "vhosts":{
+                    "mysite": {
+                        "hosts-name": ["dev.mysite.ltd", "dev.www.mysite.ltd"],
+                        "docroot": "C:\\var\\www\\www.mysite.tld\\web",
+                        "directory-index": "app_dev.php",
+                        "log-dir": "C:\\var\\www\\www.mysite.tld\\app\\logs",",
+                    },
+                    "mysite2": {
+                        "hosts-name": ["dev.www.mysite2.ltd"],
+                        "docroot": "C:\\var\\www\\www.mysite2.tld\\web",
+                        "directory-index": "app_dev.php",
+                        "log-dir": "C:\\var\\www\\www.mysite2.tld\\app\\logs",",
+                    }
+                }
+            }
         
 - run server
 
