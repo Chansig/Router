@@ -11,20 +11,21 @@ class PhpRouter
 {
 
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.2';
+    const VERSION = '0.3';
     /**
      * @var array
      */
     protected $config = [
         "hosts-name" => [],
         "docroot" => null,
-        "directory-index" => "index.php",
+        "directory-index" => ["index.php", "index.html"],
         "allow-origin" => false,
         "handle-404" => false,
         "cache" => 0,
         "log" => true,
         "log-dir" => null,
-        "vhosts" => []
+        "vhosts" => [],
+        "auto-index-file" => null,
     ];
 
     /**
@@ -43,17 +44,23 @@ class PhpRouter
     protected $host = '';
 
     /**
+     * @var string
+     */
+    protected $originaDocRoot;
+
+    /**
      * @param $config
      */
     public function __construct($config = [])
     {
         if (null === $config) {
-            throw new \Exception('Invalid configuraion. Check your router.json syntax.');
+            throw new \Exception('Invalid configuration. Check your router.json syntax.');
         }
         $this->config = array_merge($this->config, $config);
         $this->host = explode(':', $_SERVER['HTTP_HOST'])[0];
         $path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
         $this->extension = pathinfo($path, PATHINFO_EXTENSION);
+        $this->originaDocRoot = $_SERVER['DOCUMENT_ROOT'];
 
         if (!empty($this->config['vhosts'])) {
             foreach ($this->config['vhosts'] as $vhost) {
@@ -73,6 +80,7 @@ class PhpRouter
             $_SERVER['DOCUMENT_ROOT'] = $this->config['docroot'];
         }
         $this->scriptFilename = $_SERVER['DOCUMENT_ROOT'] . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
+        $this->originalScriptFilename = $this->originaDocRoot . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
         $_SERVER['SCRIPT_FILENAME'] = $this->scriptFilename;
         $GLOBALS['_SERVER'] = $_SERVER;
     }
@@ -142,25 +150,49 @@ class PhpRouter
      */
     protected function executeUnknownFile()
     {
-        if ($this->config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
-            return $this->error(404);
-        } else {
+        foreach ($this->config['directory-index'] as $index) {
+            // directory-index (index.php or index.html) exists in directory
+            if (file_exists($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index)) {
+                $this->logAccess('200');
+                $_SERVER['SCRIPT_FILENAME'] = $_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index;
+                chdir(dirname($_SERVER['SCRIPT_FILENAME']));
+                return $_SERVER['SCRIPT_FILENAME'];
+            }
+
+            // directory-index router exists (app.php) exist in directory
+            if (file_exists($_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $index)) {
+                $this->logAccess('200');
+                $_SERVER['SCRIPT_FILENAME'] = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $index;
+                return $_SERVER['SCRIPT_FILENAME'];
+            }
+        }
+
+        // auto-index-file has been set in router.json. @ see chansig/directory
+        if ($this->config['auto-index-file'] && file_exists($this->config['auto-index-file'])) {
             $this->logAccess('200');
-            $_SERVER['SCRIPT_FILENAME'] = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $this->config['directory-index'];
-            include $_SERVER['SCRIPT_FILENAME'];
-            exit;
+            if (is_dir($_SERVER['SCRIPT_FILENAME'])) {
+                chdir($_SERVER['SCRIPT_FILENAME']);
+            } else {
+                chdir(dirname($_SERVER['SCRIPT_FILENAME']));
+            }
+            return $this->config['auto-index-file'];
+        } elseif ($this->config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
+            return $this->error(404);
         }
     }
+
 
     /**
      * @return bool
      */
-    protected function executeKnownFile()
+    protected
+    function executeKnownFile()
     {
         $this->logAccess('200');
-        if (in_array($this->extension, $this->getSupportedMime()) && !$this->config['allow-origin'] && 0 === $this->config['cache']) {
+
+        if (in_array($this->extension, $this->getSupportedMime()) && !$this->config['allow-origin'] && 0 === $this->config['cache'] && file_exists($this->originalScriptFilename)) {
             return false;
-        } elseif (array_key_exists($this->extension, $this->getMimeTypes())) {
+        } elseif (array_key_exists($this->extension, $this->getMimeTypes()) && file_exists($this->scriptFilename)) {
             $types = $this->getMimeTypes()[$this->extension];
             if (!is_array($types)) {
                 $types = [$types];
@@ -183,7 +215,8 @@ class PhpRouter
     /**
      * @return array
      */
-    protected function getSupportedMime()
+    protected
+    function getSupportedMime()
     {
         $mime = ['html'];
 
@@ -216,7 +249,8 @@ class PhpRouter
      *
      * @return array
      */
-    protected function getMimeTypes()
+    protected
+    function getMimeTypes()
     {
         return [
             'hqx' => 'application/mac-binhex40',
@@ -321,7 +355,8 @@ class PhpRouter
      * @param int $error
      * @return bool
      */
-    protected function error($error = 404)
+    protected
+    function error($error = 404)
     {
         $this->logAccess($error);
         if (403 === $error) {
@@ -338,7 +373,8 @@ class PhpRouter
     /**
      * @param int $status
      */
-    protected function logAccess($status = 200)
+    protected
+    function logAccess($status = 200)
     {
         if ($this->config['log']) {
             $now = new \DateTime('now', new \DateTimeZone('UTC'));

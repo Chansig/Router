@@ -84,35 +84,53 @@ Set configuration values in router.json:
     @var string[] []  
     List of allowed hosts if not empty.
 
+
 -   "docroot"  
     @var null|string null  
     Override Server DOCUMENT_ROOT if not null  
 
+
 -   "directory-index"  
     @var string "index.php"  
     Directory index filename.
+
 
 -  "allow-origin"  
     @var bool true  
     Send Header Access-Control-Allow-Origin: *.  
     Useful for fonts files required on local CDN.  
         
+
 -   "handle-404"  
     @var bool false  
     Router handles 404 error page.  
     
+
 -   "cache"
     @var int 0  
     Send http cache headers if > 0. Ex: Cache-Control: public, max-age=300  
+
 
 -   "log"  
     @var bool true
     Send access logs to output if true
     
+
 -   "log-dir"  
     @var null|string  null
     Write access logs to log-dir if not null  
+        
+
+-   "auto-index-file"  
+    @var null|string  null  
+    PHP index Directory for directory listing. @see Chansig/DirectoryIndex.  
     
+    To add auto-index-file, composer install chansig/directoryindex.  
+    Set "auto-index-file" to absolute path of file vendor/chansig/directoryindex/directory.php.  
+    
+        ex : /var/www/myphotos/vendor/chansig/directoryindex/directory.php  
+
+
 -   "vhosts"  
     @var object  
     list of virtual hosts.  
@@ -126,23 +144,24 @@ Set configuration values in router.json:
         {
             "hosts-name":  [],
             "docroot": null,
-            "directory-index": "index.php",
+            "directory-index": ["index.php"],
             "allow-origin":  false,
             "handle-404":  false,
             "cache":  0,
             "log":  true,
             "log-dir":  null,
+            "auto-index-file":  null,
             "vhosts":{
                 "serverkey1": {
                     "hosts-name": ["dev.mysite.ltd", "dev.www.mysite.ltd"],
                     "docroot": "/var/www/www.mysite.tld",
-                    "directory-index": "mydirectoryindex.php",
+                    "directory-index": ["mydirectoryindex.php"],
                     "log-dir": "/var/log/php/mysite.ltd",
                 },
                 "serverkey1": {
                     "hosts-name": ["cdn.dev.mysite.ltd""],
                     "docroot": "/var/www/www.mysite.tld",
-                    "directory-index": "mydirectoryindex.php",
+                    "directory-index": ["index.html", "mydirectoryindex.php"],
                     "allow-origin": true,
                     "cache": 43200,
                     "handle-404": true,
@@ -160,15 +179,20 @@ For exemple, sf2 site on windows:
                     "mysite": {
                         "hosts-name": ["dev.mysite.ltd", "dev.www.mysite.ltd"],
                         "docroot": "C:\\var\\www\\www.mysite.tld\\web",
-                        "directory-index": "app_dev.php",
+                        "directory-index": ["app_dev.php"],
                         "log-dir": "C:\\var\\www\\www.mysite.tld\\app\\logs",",
                     },
                     "mysite2": {
                         "hosts-name": ["dev.www.mysite2.ltd"],
                         "docroot": "C:\\var\\www\\www.mysite2.tld\\web",
-                        "directory-index": "app_dev.php",
+                        "directory-index": ["app_dev.php"],
                         "log-dir": "C:\\var\\www\\www.mysite2.tld\\app\\logs",",
-                    }
+                    },
+                    "directory": {
+                        "hosts-name": ["dev.www.mysite3.ltd"],
+                        "docroot": "C:\\var\\www\\www.mysite23.tld",
+                        "auto-index-file": "C:\\var\\www\\vendor\\chansig\\directoryindex\\directory.php"
+                    },
                 }
             }
         
