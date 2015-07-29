@@ -9,9 +9,8 @@ namespace Chansig\Router;
  */
 class PhpRouter
 {
-
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.3';
+    const VERSION = '0.3.1';
     /**
      * @var array
      */
@@ -53,7 +52,7 @@ class PhpRouter
      */
     public function __construct($config = [])
     {
-        if (null === $config) {
+        if (!is_array($config)) {
             throw new \Exception('Invalid configuration. Check your router.json syntax.');
         }
         $this->config = array_merge($this->config, $config);
@@ -67,14 +66,28 @@ class PhpRouter
                 if (in_array($this->host, $vhost['hosts-name'])) {
                     $this->config = array_merge($this->config, $vhost);
                     break;
+                } else {
+                    foreach ($vhost['hosts-name'] as $host) {
+                        $pattern = "@" . $host . "@";
+                        if (preg_match($pattern, $this->host, $matches)) {
+                            for ($i = 1; $i < count($matches); $i++) {
+                                $vhost['hosts-name'] = [$this->host];
+                                $vhost['docroot'] = str_replace('$' . $i, $matches[$i], $vhost['docroot']);
+                                $vhost['log-dir'] = str_replace('$' . $i, $matches[$i], $vhost['log-dir']);
+                            }
+                            $this->config = array_merge($this->config, $vhost);
+                            break;
+                        }
+                    }
                 }
             }
         }
+
         if (!is_null($this->config['docroot']) && !is_dir($this->config['docroot'])) {
-            throw new \Exception('Invalid docroot. Check your router.json syntax.');
+            $this->error(500, 'Invalid docroot. Check your router.json syntax.');
         }
         if (!is_null($this->config['log-dir']) && !is_dir($this->config['log-dir'])) {
-            throw new \Exception(sprintf('%s is not a valid log-dir. Check your router.json syntax.', $this->config['log-dir']));
+            $this->error(500, sprintf('%s is not a valid log-dir. Check your router.json syntax.', $this->config['log-dir']));
         }
         if (!is_null($this->config['docroot'])) {
             $_SERVER['DOCUMENT_ROOT'] = $this->config['docroot'];
@@ -153,31 +166,33 @@ class PhpRouter
         foreach ($this->config['directory-index'] as $index) {
             // directory-index (index.php or index.html) exists in directory
             if (file_exists($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index)) {
-                $this->logAccess('200');
                 $_SERVER['SCRIPT_FILENAME'] = $_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index;
-                chdir(dirname($_SERVER['SCRIPT_FILENAME']));
-                return $_SERVER['SCRIPT_FILENAME'];
-            }
-
-            // directory-index router exists (app.php) exist in directory
-            if (file_exists($_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $index)) {
-                $this->logAccess('200');
+            } // directory-index router exists (app.php) exist in directory
+            elseif (file_exists($_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $index)) {
                 $_SERVER['SCRIPT_FILENAME'] = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $index;
-                return $_SERVER['SCRIPT_FILENAME'];
+            } else {
+                continue;
             }
-        }
 
+            chdir(dirname($_SERVER['SCRIPT_FILENAME']));
+            $this->logAccess('200');
+            $this->sendHeaders();
+            return $_SERVER['SCRIPT_FILENAME'];
+        }
         // auto-index-file has been set in router.json. @ see chansig/directory
         if ($this->config['auto-index-file'] && file_exists($this->config['auto-index-file'])) {
-            $this->logAccess('200');
             if (is_dir($_SERVER['SCRIPT_FILENAME'])) {
                 chdir($_SERVER['SCRIPT_FILENAME']);
             } else {
                 chdir(dirname($_SERVER['SCRIPT_FILENAME']));
             }
+            $this->logAccess('200');
+            $this->sendHeaders();
             return $this->config['auto-index-file'];
-        } elseif ($this->config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
+        } elseif ($this->config['handle-404'] && '/' !== $_SERVER['SCRIPT_NAME']) {
             return $this->error(404);
+        } else {
+            return $this->error(500, 'Invalid directory-index');
         }
     }
 
@@ -185,27 +200,14 @@ class PhpRouter
     /**
      * @return bool
      */
-    protected
-    function executeKnownFile()
+    protected function executeKnownFile()
     {
         $this->logAccess('200');
 
         if (in_array($this->extension, $this->getSupportedMime()) && !$this->config['allow-origin'] && 0 === $this->config['cache'] && file_exists($this->originalScriptFilename)) {
             return false;
         } elseif (array_key_exists($this->extension, $this->getMimeTypes()) && file_exists($this->scriptFilename)) {
-            $types = $this->getMimeTypes()[$this->extension];
-            if (!is_array($types)) {
-                $types = [$types];
-            }
-            foreach ($types as $type) {
-                header(sprintf('Content-type: %s', $type));
-            }
-            if ($this->config['allow-origin']) {
-                header('Access-Control-Allow-Origin: *');
-            }
-            if (!is_null($this->config['cache'])) {
-                header(sprintf('Cache-Control: public, max-age=%1$d', $this->config['cache']));
-            }
+            $this->sendHeaders();
             readfile($this->scriptFilename);
             exit;
         }
@@ -213,10 +215,34 @@ class PhpRouter
     }
 
     /**
+     *
+     */
+    protected function sendHeaders()
+    {
+        if ('' !== $this->extension) {
+            $types = $this->getMimeTypes();
+            if (isset($types[$this->extension])) {
+                $types = $types [$this->extension];
+                if (!is_array($types)) {
+                    $types = [$types];
+                }
+                foreach ($types as $type) {
+                    header(sprintf('Content-type: %s', $type));
+                }
+            }
+        }
+        if ($this->config['allow-origin']) {
+            header('Access-Control-Allow-Origin: *');
+        }
+        if (!is_null($this->config['cache'])) {
+            header(sprintf('Cache-Control: public, max-age=%1$d', $this->config['cache']));
+        }
+    }
+
+    /**
      * @return array
      */
-    protected
-    function getSupportedMime()
+    protected function getSupportedMime()
     {
         $mime = ['html'];
 
@@ -249,8 +275,7 @@ class PhpRouter
      *
      * @return array
      */
-    protected
-    function getMimeTypes()
+    protected function getMimeTypes()
     {
         return [
             'hqx' => 'application/mac-binhex40',
@@ -355,32 +380,39 @@ class PhpRouter
      * @param int $error
      * @return bool
      */
-    protected
-    function error($error = 404)
+    protected function error($error = 500, $message = '')
     {
         $this->logAccess($error);
         if (403 === $error) {
-            header("HTTP/1.0 403 Forbidden");
             $status = 'Forbidden';
-        } else {
-            header("HTTP/1.0 404 Not Found");
+            if ('' === $message) {
+                $message = sprintf('Access Forbidden for the requested resource <strong>%s</strong> on this server.', $_SERVER['REQUEST_URI']);
+            }
+        } elseif (404 === $error) {
             $status = 'Not Found';
+            if ('' === $message) {
+                $message = sprintf('The requested resource <strong>%4$s</strong> was Not Found on this server.', $_SERVER['REQUEST_URI']);
+            }
+        } else {
+            $status = 'Internal server error';
         }
-        echo sprintf('<!doctype html><html><head><title>%1$s %2$s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%2$s</h1><p>The requested resource <strong>%4$s</strong> was %3$s on this server.</p><hr /><p>%5$s %6$s</p><hr/>Chansig/Router</body></html>', $error, $status, strtolower($status), $_SERVER['REQUEST_URI'], static::VENDOR_NAME, static::VERSION);
+        header(sprintf("HTTP/1.0 %d %s", $error, $status));
+
+        echo sprintf('<!doctype html><html><head><title>%s %s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%s</h1><p>%s</p><hr /><p>%s %s</p></body></html>', $error, $status, strtolower($status), $message, static::VENDOR_NAME, static::VERSION);
         return true;
     }
 
     /**
      * @param int $status
      */
-    protected
-    function logAccess($status = 200)
+    protected function logAccess($status = 200)
     {
-        if ($this->config['log']) {
+        if ($this->config['log'] || $this->config['log-dir']) {
             $now = new \DateTime('now', new \DateTimeZone('UTC'));
             $log = sprintf("[%s] %s:%s [%s]: %s\n", $now->format("D M j H:i:s Y"), $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $status, $_SERVER["REQUEST_URI"]);
-
-            file_put_contents("php://stdout", $log);
+            if ($this->config['log']) {
+                file_put_contents("php://stdout", $log);
+            }
             if (!is_null($this->config['log-dir'])) {
                 $filename = sprintf('%s%srouter-access-%s.log', $this->config['log-dir'], DIRECTORY_SEPARATOR, $this->host);
                 error_log($log, 3, $filename);

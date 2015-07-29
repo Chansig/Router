@@ -17,4 +17,3 @@ if (is_bool($result = $router->run())) {
 if ($append = $router->append()) {
     include $append;
 }
-

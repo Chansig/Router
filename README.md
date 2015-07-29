@@ -42,14 +42,14 @@ You can then later update Chansig/Router using composer:
 
     php -S <addr>:<port> -t <docroot> vendor/chansig/router/src/router.php
 
-ex:
+e.g.
     php -S localhost:80 vendor/chansig/router/src/router.php
 
-ex on Symfony:
+e.g. on Symfony:
 
     php -S 127.0.0.1:8080 -t web vendor/chansig/src/router/router_symfony_dev.php
   
-ex on Wordpress:
+e.g. on Wordpress:
 
     php -S localhost:81 -t wordpress vendor/chansig/src/router/router.php
 
@@ -75,19 +75,19 @@ override ini values
 
 ### Override configuration
 
-- copy vendor/chansig/src/router/router.json in your main directory
+- copy vendor/chansig/router/router.json in your main directory
 
 Set configuration values in router.json:
 
        
 -   "hosts-name"  
     @var string[] []  
-    List of allowed hosts if not empty.
-
-
+    List of allowed hosts if not empty.    
+  
+  
 -   "docroot"  
     @var null|string null  
-    Override Server DOCUMENT_ROOT if not null  
+    Override Server DOCUMENT_ROOT if not null
 
 
 -   "directory-index"  
@@ -128,17 +128,18 @@ Set configuration values in router.json:
     To add auto-index-file, composer install chansig/directoryindex.  
     Set "auto-index-file" to absolute path of file vendor/chansig/directoryindex/directory.php.  
     
-        ex : /var/www/myphotos/vendor/chansig/directoryindex/directory.php  
+        e.g. /var/www/myphotos/vendor/chansig/directoryindex/directory.php  
 
 
 -   "vhosts"  
     @var object  
     list of virtual hosts.  
+    
     You must define server(s) name and document root for each vhost.  
     Configuration is the same as the global configuration.  
     Vhost configuration is merged into global configuration.  
     
-    ex:  
+    e.g.  
         
         #router.json
         {
@@ -169,7 +170,22 @@ Set configuration values in router.json:
                 }
             }
         }
-        
+
+    
+    In vhosts configuration, **hosts-name** can be a regex. Captured patterns are available in $1 to $n string.  
+    
+    e.g.
+    
+        "hosts-name": ["dev.www.([a-z]+).([a-z]+)"],
+               
+    They will be replaced in **docroot** and **log-dir** values.  
+    
+    e.g.  
+     
+        "docroot": "/var/www/www.$1.$2/web",
+        "log-dir": "/var/log/php/www.$1.$2", 
+
+
 You can skip default configuration:  
 For exemple, sf2 site on windows:
 
@@ -195,10 +211,19 @@ For exemple, sf2 site on windows:
                     },
                 }
             }
-        
+
+- load config into router
+
+        $config = json_decode(file_get_contents(__DIR__ . '/router.json'), true);
+        $router = new Chansig\Router\PhpRouter($config);
+
 - run server
 
         php -S localhost:80 router.php
+
+## Warning
+
+On OSX, run  sudo php -S localhost:{port} router.php for port < 1024
 
 ## License
 
