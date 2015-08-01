@@ -161,8 +161,12 @@ class PhpRouter
                         if (preg_match($pattern, static::$host, $matches)) {
                             for ($i = 1; $i < count($matches); $i++) {
                                 $vhost['hosts-name'] = [static::$host];
-                                $vhost['docroot'] = str_replace('$' . $i, $matches[$i], $vhost['docroot']);
-                                $vhost['log-dir'] = str_replace('$' . $i, $matches[$i], $vhost['log-dir']);
+                                if (isset($vhost['docroot']) && !is_null($vhost['docroot'])) {
+                                    $vhost['docroot'] = str_replace('$' . $i, $matches[$i], $vhost['docroot']);
+                                }
+                                if (isset($vhost['log-dir']) & !is_null($vhost['log-dir'])) {
+                                    $vhost['log-dir'] = str_replace('$' . $i, $matches[$i], $vhost['log-dir']);
+                                }
                             }
                             static::$config = array_merge(static::$config, $vhost);
                             break;
@@ -204,7 +208,7 @@ class PhpRouter
             }
             if (!is_null(static::$config['allow-origin'])) {
                 foreach (static::$config['allow-origin'] as $origin) {
-                    header(sprintf('Content-type: %s', $origin));
+                    header(sprintf('Access-Control-Allow-Origin: %s', $origin));
                 }
             }
             if (!is_null(static::$config['cache-control'])) {
