@@ -2,18 +2,17 @@
 
 require __DIR__ . '/../../../../vendor/autoload.php';
 
-$router = new Chansig\Router\PhpRouter();
+use Chansig\Router\PhpRouter;
 
-if ($prepend = $router->prepend()) {
+$config = json_decode(file_get_contents(__DIR__ . '/router.json'), true);
+PhpRouter::configure($config);
+
+if ($prepend = PhpRouter::prepend()) {
     include $prepend;
 }
 
-if (is_bool($result = $router->run())) {
+if (is_bool($result = PhpRouter::run())) {
     return $result;
 } else {
     include($result);
-}
-
-if ($append = $router->append()) {
-    include $append;
 }

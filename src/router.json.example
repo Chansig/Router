@@ -1,0 +1,46 @@
+{
+    "hosts-name": [],
+    "docroot": null,
+    "directory-index": [
+        "index.php",
+        "index.html"
+    ],
+    "allow-origin": null,
+    "handle-404": false,
+    "cache": null,
+    "log": true,
+    "log-dir": null,
+    "auto-index-file": null,
+    "vhosts": {
+        "www": {
+            "hosts-name": [
+                "dev.www.([a-z]+).([a-z]+)"
+            ],
+            "docroot": "/var/www/www.$1.$2/web",
+            "directory-index": [
+                "app_dev.php"
+            ],
+            "allow-origin": null,
+            "handle-404": false,
+            "cache": null,
+            "log": true,
+            "log-dir": "/var/www/www.$1.$2/app/logs",
+            "auto-index-file": null
+        },
+        "cdn": {
+            "hosts-name": [
+                "dev.cdn.www.([a-z]+).([a-z]+)"
+            ],
+            "docroot": "/var/www/www.$1.$2/web",
+            "directory-index": [
+                "app_dev.php"
+            ],
+            "allow-origin": ["*"],
+            "handle-404": false,
+            "cache": 86400,
+            "log": true,
+            "log-dir": "/var/www/www.$1.$2/app/logs",
+            "auto-index-file": null
+        }
+    }
+}

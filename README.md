@@ -3,8 +3,13 @@ Chansig/Router
 
 PHP Router for PHP5.4+ Built-in Server
 
-Works fine in Wordpress, Symfony 2, etc.
+Works on:
 
+- Wordpress
+- Symfony 2,
+- Laraval,
+- phpMyAdmin,
+- etc.
 
 ## Features
 
@@ -19,6 +24,10 @@ Works fine in Wordpress, Symfony 2, etc.
 ## Requirement
 
 PHP 5.4+
+
+## Warning
+
+The built-in PHP web server is NOT meant to be a replacement for any production web server. It should used for development purposes only!
 
 ##  Installation
 
@@ -61,7 +70,6 @@ e.g. on Wordpress:
 
 override ini values
 
-     php -S localhost:81 -t wordpress -c vendor/chansig/src/router/router.ini vendor/chansig/src/router/router.php
      php -S localhost:81 -t wordpress -c my.ini router.php
 
 ## Configuration
@@ -75,7 +83,8 @@ override ini values
 
 ### Override configuration
 
-- copy vendor/chansig/router/router.json in your main directory
+- copy vendor/chansig/src/router/router.json.example in your main directory
+- copy router.json.example to router.json
 
 Set configuration values in router.json:
 
@@ -96,20 +105,26 @@ Set configuration values in router.json:
 
 
 -  "allow-origin"  
-    @var bool true  
-    Send Header Access-Control-Allow-Origin: *.  
-    Useful for fonts files required on local CDN.  
+    @var null|array null  
+    Send Header Access-Control-Allow-Origin for defined hosts.  
+    Useful for fonts files required on local CDN or Ajax requests.  
+    e.g.
         
+            "allow-origin": ["*"]
+
 
 -   "handle-404"  
     @var bool false  
     Router handles 404 error page.  
     
 
--   "cache"
-    @var int 0  
+-   "cache-control"
+    @var null|int null  
     Send http cache headers if > 0. Ex: Cache-Control: public, max-age=300  
 
+    e.g.
+            
+            "cache-control": 86400
 
 -   "log"  
     @var bool true
@@ -119,16 +134,22 @@ Set configuration values in router.json:
 -   "log-dir"  
     @var null|string  null
     Write access logs to log-dir if not null  
-        
+    
+    e.g.
+            
+            "log-dir": "/Users/Toto/Sites/mysite.fr/app/logs"
+
 
 -   "auto-index-file"  
     @var null|string  null  
     PHP index Directory for directory listing. @see Chansig/DirectoryIndex.  
     
     To add auto-index-file, composer install chansig/directoryindex.  
-    Set "auto-index-file" to absolute path of file vendor/chansig/directoryindex/directory.php.  
+    Set "auto-index-file" to absolute path of file vendor/chansig/directoryindex/src/directory.php.  
     
-        e.g. /var/www/myphotos/vendor/chansig/directoryindex/directory.php  
+    e.g.
+            
+            "auto-index-file": "/var/www/myphotos/vendor/chansig/directoryindex/src/directory.php"  
 
 
 -   "vhosts"  
@@ -146,9 +167,9 @@ Set configuration values in router.json:
             "hosts-name":  [],
             "docroot": null,
             "directory-index": ["index.php"],
-            "allow-origin":  false,
+            "allow-origin":  null,
             "handle-404":  false,
-            "cache":  0,
+            "cache-control":  0,
             "log":  true,
             "log-dir":  null,
             "auto-index-file":  null,
@@ -163,8 +184,8 @@ Set configuration values in router.json:
                     "hosts-name": ["cdn.dev.mysite.ltd""],
                     "docroot": "/var/www/www.mysite.tld",
                     "directory-index": ["index.html", "mydirectoryindex.php"],
-                    "allow-origin": true,
-                    "cache": 43200,
+                    "allow-origin": null,
+                    "cache-control": 43200,
                     "handle-404": true,
                     "log": false
                 }
@@ -215,7 +236,7 @@ For exemple, sf2 site on windows:
 - load config into router
 
         $config = json_decode(file_get_contents(__DIR__ . '/router.json'), true);
-        $router = new Chansig\Router\PhpRouter($config);
+        PhpRouter::configure($config);
 
 - run server
 
