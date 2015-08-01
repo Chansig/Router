@@ -164,7 +164,7 @@ class PhpRouter
                                 if (isset($vhost['docroot']) && !is_null($vhost['docroot'])) {
                                     $vhost['docroot'] = str_replace('$' . $i, $matches[$i], $vhost['docroot']);
                                 }
-                                if (isset($vhost['log-dir']) & !is_null($vhost['log-dir'])) {
+                                if (isset($vhost['log-dir']) && !is_null($vhost['log-dir'])) {
                                     $vhost['log-dir'] = str_replace('$' . $i, $matches[$i], $vhost['log-dir']);
                                 }
                             }
