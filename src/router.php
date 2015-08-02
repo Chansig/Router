@@ -4,15 +4,17 @@ require __DIR__ . '/../../../../vendor/autoload.php';
 
 use Chansig\Router\PhpRouter;
 
-$config = json_decode(file_get_contents(__DIR__ . '/router.json'), true);
-PhpRouter::configure($config);
+$router = new PhpRouter();
 
-if ($prepend = PhpRouter::prepend()) {
+if ($prepend = $router->prepend()) {
     include $prepend;
 }
 
-if (is_bool($result = PhpRouter::run())) {
+if (is_bool($result = $router->run())) {
     return $result;
+} elseif (is_resource($result) && 'stream' === get_resource_type($result)) {
+    echo stream_get_contents($result);
+    fclose($result);
 } else {
     include($result);
 }

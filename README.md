@@ -7,7 +7,7 @@ Works on:
 
 - Wordpress
 - Symfony 2,
-- Laraval,
+- Laravel,
 - phpMyAdmin,
 - etc.
 
@@ -90,36 +90,45 @@ Set configuration values in router.json:
 
        
 -   "hosts-name"  
-    @var string[] []  
+    @var string[] ***[]***  
     List of allowed hosts if not empty.    
   
   
 -   "docroot"  
-    @var null|string null  
+    @var null|string ***null***  
     Override Server DOCUMENT_ROOT if not null
 
 
 -   "directory-index"  
-    @var string "index.php"  
-    Directory index filename.
+    @var null|array ***["index.php", "index.html"]***  
+    Directory index filenames.  
 
 
+-   "rewrite-index"  
+    @var null|array ***null***  
+    Rewrite filenames in docroot.  
+
+    e.g.
+        
+            "rewrite-index": ["app_dev.php"]  
+            
 -  "allow-origin"  
-    @var null|array null  
+    @var null|array ***null***  
     Send Header Access-Control-Allow-Origin for defined hosts.  
     Useful for fonts files required on local CDN or Ajax requests.  
+    
     e.g.
         
             "allow-origin": ["*"]
 
 
 -   "handle-404"  
-    @var bool false  
+    @var bool ***false***  
     Router handles 404 error page.  
     
 
 -   "cache-control"
-    @var null|int null  
+    @var null|int ***null***  
     Send http cache headers if > 0. Ex: Cache-Control: public, max-age=300  
 
     e.g.
@@ -127,21 +136,21 @@ Set configuration values in router.json:
             "cache-control": 86400
 
 -   "log"  
-    @var bool true
+    @var bool ***true***  
     Send access logs to output if true
     
 
--   "log-dir"  
-    @var null|string  null
-    Write access logs to log-dir if not null  
+-   "logs-dir"  
+    @var null|string  ***null***  
+    Write access logs to logs-dir if not null  
     
     e.g.
             
-            "log-dir": "/Users/Toto/Sites/mysite.fr/app/logs"
+            "logs-dir": "/Users/Toto/Sites/mysite.fr/app/logs"
 
 
 -   "auto-index-file"  
-    @var null|string  null  
+    @var null|string  ***null***  
     PHP index Directory for directory listing. @see Chansig/DirectoryIndex.  
     
     To add auto-index-file, composer install chansig/directoryindex.  
@@ -153,8 +162,8 @@ Set configuration values in router.json:
 
 
 -   "vhosts"  
-    @var object  
-    list of virtual hosts.  
+    @var object  ***null***  
+    List of virtual hosts.  
     
     You must define server(s) name and document root for each vhost.  
     Configuration is the same as the global configuration.  
@@ -167,18 +176,20 @@ Set configuration values in router.json:
             "hosts-name":  [],
             "docroot": null,
             "directory-index": ["index.php"],
+            "rewrite-index": null,
+            "allow-origin":  null,
             "allow-origin":  null,
             "handle-404":  false,
             "cache-control":  0,
             "log":  true,
-            "log-dir":  null,
+            "logs-dir":  null,
             "auto-index-file":  null,
             "vhosts":{
                 "serverkey1": {
                     "hosts-name": ["dev.mysite.ltd", "dev.www.mysite.ltd"],
                     "docroot": "/var/www/www.mysite.tld",
-                    "directory-index": ["mydirectoryindex.php"],
-                    "log-dir": "/var/log/php/mysite.ltd",
+                    "rewrite-index": ["app_dev.php"],
+                    "logs-dir": "/var/log/php/mysite.ltd",
                 },
                 "serverkey1": {
                     "hosts-name": ["cdn.dev.mysite.ltd""],
@@ -199,12 +210,12 @@ Set configuration values in router.json:
     
         "hosts-name": ["dev.www.([a-z]+).([a-z]+)"],
                
-    They will be replaced in **docroot** and **log-dir** values.  
+    They will be replaced in **docroot** and **logs-dir** values.  
     
     e.g.  
      
         "docroot": "/var/www/www.$1.$2/web",
-        "log-dir": "/var/log/php/www.$1.$2", 
+        "logs-dir": "/var/log/php/www.$1.$2", 
 
 
 You can skip default configuration:  
@@ -216,14 +227,14 @@ For exemple, sf2 site on windows:
                     "mysite": {
                         "hosts-name": ["dev.mysite.ltd", "dev.www.mysite.ltd"],
                         "docroot": "C:\\var\\www\\www.mysite.tld\\web",
-                        "directory-index": ["app_dev.php"],
-                        "log-dir": "C:\\var\\www\\www.mysite.tld\\app\\logs",",
+                        "rewrite-index": ["app_dev.php"],
+                        "logs-dir": "C:\\var\\www\\www.mysite.tld\\app\\logs",",
                     },
                     "mysite2": {
                         "hosts-name": ["dev.www.mysite2.ltd"],
                         "docroot": "C:\\var\\www\\www.mysite2.tld\\web",
-                        "directory-index": ["app_dev.php"],
-                        "log-dir": "C:\\var\\www\\www.mysite2.tld\\app\\logs",",
+                        "rewrite-rewrite": ["app_dev.php"],
+                        "logs-dir": "C:\\var\\www\\www.mysite2.tld\\app\\logs",",
                     },
                     "directory": {
                         "hosts-name": ["dev.www.mysite3.ltd"],
@@ -236,7 +247,7 @@ For exemple, sf2 site on windows:
 - load config into router
 
         $config = json_decode(file_get_contents(__DIR__ . '/router.json'), true);
-        PhpRouter::configure($config);
+        $router = new PhpRouter($config);
 
 - run server
 

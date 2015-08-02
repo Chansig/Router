@@ -5,11 +5,12 @@
         "index.php",
         "index.html"
     ],
+    "rewrite-index" => null,
     "allow-origin": null,
     "handle-404": false,
     "cache": null,
     "log": true,
-    "log-dir": null,
+    "logs-dir": null,
     "auto-index-file": null,
     "vhosts": {
         "www": {
@@ -24,7 +25,7 @@
             "handle-404": false,
             "cache": null,
             "log": true,
-            "log-dir": "/var/www/www.$1.$2/app/logs",
+            "logs-dir": "/var/www/www.$1.$2/app/logs",
             "auto-index-file": null
         },
         "cdn": {
@@ -39,7 +40,7 @@
             "handle-404": false,
             "cache": 86400,
             "log": true,
-            "log-dir": "/var/www/www.$1.$2/app/logs",
+            "logs-dir": "/var/www/www.$1.$2/app/logs",
             "auto-index-file": null
         }
     }

@@ -1,0 +1,7 @@
+<phpunit bootstrap="vendor/autoload.php">
+    <testsuites>
+        <testsuite name="Chansig\Router">
+            <directory>src/Router/Tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

@@ -10,19 +10,20 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.4.0';
+    const VERSION = '0.5.0';
     /**
      * @var array
      */
-    protected static $config = [
+    protected $config = [
         "hosts-name" => [],
         "docroot" => null,
         "directory-index" => ["index.php", "index.html"],
+        "rewrite-index" => null,
         "allow-origin" => null,
         "handle-404" => false,
         "cache-control" => 0,
         "log" => true,
-        "log-dir" => null,
+        "logs-dir" => null,
         "vhosts" => [],
         "auto-index-file" => null,
     ];
@@ -30,70 +31,102 @@ class PhpRouter
     /**
      * @var string
      */
-    protected static $extension = '';
+    protected $extension = '';
 
     /**
      * @var string
      */
-    protected static $scriptFilename = '';
+    protected $scriptFilename = '';
 
     /**
      * @var string
      */
-    protected static $originalScriptFilename = '';
+    protected $originalScriptFilename = '';
 
     /**
      * @var string
      */
-    protected static $host = '';
+    protected $docroot;
 
     /**
      * @var string
      */
-    protected static $originaDocRoot;
+    protected $host = '';
+
+    /**
+     * @var int
+     */
+    protected $port = '';
+
+    /**
+     * @var string
+     */
+    protected $originaDocRoot;
+
+    /**
+     * @var string
+     */
+    public $output = 'php://stdout';
 
     /**
      * @param array $config
-     * @throws \Exception
      */
-    public static function configure(array $config)
+    public function __construct(array $config = [])
     {
-        if (!is_array($config)) {
-            throw new \Exception('Invalid configuration. Check your configuration syntax.');
+        if (!empty($config)) {
+            $this->configure($config);
         }
-        static::$config = array_merge(static::$config, $config);
-        static::configureVhosts();
+        $this->initFromGlobals();
+    }
+
+    /**
+     * @param $config
+     */
+    protected function configure($config)
+    {
+        $this->config = array_merge($this->config, $config);
+        $this->configureVhosts();
+        if (!is_null($this->config['docroot']) && !is_dir($this->config['docroot'])) {
+            throw new \InvalidArgumentException(sprintf('%s is not a valid docroot directory. Check your configuration syntax.', $this->config['docroot']));
+        }
+        if (!is_null($this->config['logs-dir']) && !is_dir($this->config['logs-dir'])) {
+            throw new \InvalidArgumentException(sprintf('%s is not a valid logs directory. Check your configuration syntax.', $this->config['logs-dir']));
+        }
+
     }
 
     /**
      * @throws \Exception
      */
-    public static function init()
+    protected function initFromGlobals()
     {
-        static::$host = explode(':', $_SERVER['HTTP_HOST'])[0];
         $path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
-        static::$extension = pathinfo($path, PATHINFO_EXTENSION);
-        static::$originaDocRoot = $_SERVER['DOCUMENT_ROOT'];
+        $exp = explode(':', $_SERVER['HTTP_HOST']);
 
-        if (!is_null(static::$config['docroot']) && !is_dir(static::$config['docroot'])) {
-            static::error(500, 'Invalid docroot. Check your configuration syntax.');
+        $this->extension = pathinfo($path, PATHINFO_EXTENSION);
+        $this->originaDocRoot = $_SERVER['DOCUMENT_ROOT'];
+        $this->host = $exp[0];
+        if (isset($exp[1])) {
+            $this->port = $exp[1];
+        } else {
+            $this->port = 80;
         }
-        if (!is_null(static::$config['log-dir']) && !is_dir(static::$config['log-dir'])) {
-            static::error(500, sprintf('%s is not a valid log-dir. Check your configuration syntax.', static::$config['log-dir']));
+        if (!is_null($this->config['docroot'])) {
+            $this->docroot = $this->config['docroot'];
+        } else {
+            $this->docroot = $this->originaDocRoot;
         }
-        if (!is_null(static::$config['docroot'])) {
-            $_SERVER['DOCUMENT_ROOT'] = static::$config['docroot'];
-        }
-        static::$scriptFilename = $_SERVER['DOCUMENT_ROOT'] . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
-        static::$originalScriptFilename = static::$originaDocRoot . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
-        $_SERVER['SCRIPT_FILENAME'] = static::$scriptFilename;
-        $GLOBALS['_SERVER'] = $_SERVER;
+
+        $this->scriptFilename = $this->docroot . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
+        $this->originalScriptFilename = $this->originaDocRoot . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
+
+        $this->setGlobals();
     }
 
     /**
      * @return bool|string
      */
-    public static function prepend()
+    public function prepend()
     {
         if (ini_get('auto_prepend_file') && !in_array(realpath(ini_get('auto_prepend_file')), get_included_files(), true)) {
             return ini_get('auto_prepend_file');
@@ -104,7 +137,7 @@ class PhpRouter
     /**
      * @return bool|string
      */
-    public static function append()
+    public function append()
     {
         if (ini_get('auto_append_file') && !in_array(realpath(ini_get('auto_append_file')), get_included_files(), true)) {
             return ini_get('auto_append_file');
@@ -115,60 +148,57 @@ class PhpRouter
     /**
      * @return bool
      */
-    public static function run()
+    public function run()
     {
-        static::init();
+        if (!$this->IsAuthorized()) {
+            return $this->error(403);
+        }
 
         header(sprintf('X-Router: %s %s', static::VENDOR_NAME, static::VERSION));
 
-        if (!static::IsAuthorized()) {
-            return static::error(403);
-        }
-
-        if (php_sapi_name() !== 'cli-server') {
-            return static::send();
-        }
-
-        header(sprintf('X-Router-file: %s', $_SERVER['SCRIPT_NAME']));
-
-        if (is_file(static::$scriptFilename)) {
-            if ('php' === static::$extension) {
-                chdir(dirname(static::$scriptFilename));
-                return static::$scriptFilename;
+        if (is_file($this->scriptFilename)) {
+            if ('php' === $this->extension) {
+                chdir(dirname($this->scriptFilename));
+                return $this->scriptFilename;
             }
-            return static::executeKnownFile();
+            return $this->executeFile();
+        } elseif (is_null($this->config['rewrite-index']) && is_dir($this->scriptFilename)) {
+            return $this->executeDirectory();
+        } elseif (!is_null($this->config['rewrite-index'])) {
+            return $this->executeRewrite();
         } else {
-            return static::executeUnknownFile();
+            return $this->error(404);
         }
     }
+
 
     /**
      *
      */
-    protected static function configureVhosts()
+    protected function configureVhosts()
     {
-        static::$host = explode(':', $_SERVER['HTTP_HOST'])[0];
+        $this->host = explode(':', $_SERVER['HTTP_HOST'])[0];
 
-        if (!empty(static::$config['vhosts'])) {
-            foreach (static::$config['vhosts'] as $vhost) {
-                if (in_array(static::$host, $vhost['hosts-name'])) {
-                    static::$config = array_merge(static::$config, $vhost);
-                    unset(static::$config['vhosts']);
+        if (!empty($this->config['vhosts'])) {
+            foreach ($this->config['vhosts'] as $vhost) {
+                if (in_array($this->host, $vhost['hosts-name'])) {
+                    $this->config = array_merge($this->config, $vhost);
+                    unset($this->config['vhosts']);
                     break;
                 } else {
                     foreach ($vhost['hosts-name'] as $host) {
                         $pattern = "@" . $host . "@";
-                        if (preg_match($pattern, static::$host, $matches)) {
+                        if (preg_match($pattern, $this->host, $matches)) {
                             for ($i = 1; $i < count($matches); $i++) {
-                                $vhost['hosts-name'] = [static::$host];
+                                $vhost['hosts-name'] = [$this->host];
                                 if (isset($vhost['docroot']) && !is_null($vhost['docroot'])) {
                                     $vhost['docroot'] = str_replace('$' . $i, $matches[$i], $vhost['docroot']);
                                 }
-                                if (isset($vhost['log-dir']) && !is_null($vhost['log-dir'])) {
-                                    $vhost['log-dir'] = str_replace('$' . $i, $matches[$i], $vhost['log-dir']);
+                                if (isset($vhost['logs-dir']) && !is_null($vhost['logs-dir'])) {
+                                    $vhost['logs-dir'] = str_replace('$' . $i, $matches[$i], $vhost['logs-dir']);
                                 }
                             }
-                            static::$config = array_merge(static::$config, $vhost);
+                            $this->config = array_merge($this->config, $vhost);
                             break;
                         }
                     }
@@ -177,13 +207,20 @@ class PhpRouter
         }
     }
 
+    protected function  setGlobals()
+    {
+        $_SERVER['DOCUMENT_ROOT'] = $this->docroot;
+        $_SERVER['SCRIPT_FILENAME'] = $this->scriptFilename;
+        $GLOBALS['_SERVER'] = $_SERVER;
+    }
+
     /**
      * @return bool
      */
-    protected static function IsAuthorized()
+    protected function IsAuthorized()
     {
-        if (!empty(static::$config['hosts-name'])) {
-            if (!in_array(static::$host, static::$config['hosts-name']) && !in_array($_SERVER['REMOTE_ADDR'], static::$config['hosts-name'])) {
+        if (!empty($this->config['hosts-name'])) {
+            if (!in_array($this->host, $this->config['hosts-name']) && !in_array($_SERVER['REMOTE_ADDR'], $this->config['hosts-name'])) {
                 return false;
             }
         }
@@ -194,63 +231,71 @@ class PhpRouter
     /**
      * @return bool|string
      */
-    protected static function executeKnownFile()
+    protected function executeFile()
     {
-        if (in_array(static::$extension, static::getSupportedMime()) && is_null(static::$config['allow-origin']) && null === static::$config['cache-control'] && file_exists(static::$originalScriptFilename)) {
-            return static::send();
-        } elseif (array_key_exists(static::$extension, static::getMimeTypes()) && file_exists(static::$scriptFilename)) {
-            $types = static::getMimeTypes()[static::$extension];
+        if (in_array($this->extension, $this->getSupportedMime()) && is_null($this->config['allow-origin']) && null === $this->config['cache-control'] && file_exists($this->originalScriptFilename)) {
+            return $this->send();
+        } elseif (array_key_exists($this->extension, $this->getMimeTypes()) && file_exists($this->scriptFilename)) {
+            $types = $this->getMimeTypes()[$this->extension];
             if (!is_array($types)) {
                 $types = [$types];
             }
             foreach ($types as $type) {
                 header(sprintf('Content-type: %s', $type));
             }
-            if (!is_null(static::$config['allow-origin'])) {
-                foreach (static::$config['allow-origin'] as $origin) {
+            if (!is_null($this->config['allow-origin'])) {
+                foreach ($this->config['allow-origin'] as $origin) {
                     header(sprintf('Access-Control-Allow-Origin: %s', $origin));
                 }
             }
-            if (!is_null(static::$config['cache-control'])) {
-                header(sprintf('Cache-Control: public, max-age=%1$d', static::$config['cache-control']));
+            if (!is_null($this->config['cache-control'])) {
+                header(sprintf('Cache-Control: public, max-age=%1$d', $this->config['cache-control']));
             }
-            return static::send(static::$scriptFilename, true);
+            return $this->send($this->scriptFilename, true);
         }
-        return static::send();
+        return $this->send();
+    }
+
+    /**
+     * @return bool|string
+     */
+    protected function executeDirectory()
+    {
+        chdir($_SERVER['SCRIPT_FILENAME']);
+
+        foreach ($this->config['directory-index'] as $index) {
+            // directory-index (index.php or index.html) exists in directory
+            if (file_exists($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index)) {
+                $_SERVER['SCRIPT_FILENAME'] = $_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index;
+                return $this->send($_SERVER['SCRIPT_FILENAME']);
+            }
+        }
+
+        // auto-index-file has been set in router.json. @ see chansig/directory
+        if ($this->config['auto-index-file'] && file_exists($this->config['auto-index-file'])) {
+            return $this->send($this->config['auto-index-file']);
+        } elseif ($this->config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
+            return $this->error(404);
+        }
+
+        return $this->error(403);
     }
 
     /**
      * @return bool
      */
-    protected static function executeUnknownFile()
+    protected function executeRewrite()
     {
-        foreach (static::$config['directory-index'] as $index) {
-            // directory-index (index.php or index.html) exists in directory
-            if (file_exists($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index)) {
-                $_SERVER['SCRIPT_FILENAME'] = $_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index;
-                chdir(dirname($_SERVER['SCRIPT_FILENAME']));
-                return static::send($_SERVER['SCRIPT_FILENAME']);
-            }
-
-            // directory-index router exists (app.php) exist in docroot
-            if (file_exists($_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $index)) {
-                $_SERVER['SCRIPT_FILENAME'] = $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . $index;
-                return static::send($_SERVER['SCRIPT_FILENAME']);
+        foreach ($this->config['rewrite-index'] as $index) {
+            // rewrite-index router exists (app.php) exist in docroot
+            if (file_exists($this->docroot . DIRECTORY_SEPARATOR . $index)) {
+                $_SERVER['SCRIPT_FILENAME'] = $this->docroot . DIRECTORY_SEPARATOR . $index;
+                return $this->send($_SERVER['SCRIPT_FILENAME']);
             }
         }
 
-        // auto-index-file has been set in router.json. @ see chansig/directory
-        if (static::$config['auto-index-file'] && file_exists(static::$config['auto-index-file'])) {
-            if (is_dir($_SERVER['SCRIPT_FILENAME'])) {
-                chdir($_SERVER['SCRIPT_FILENAME']);
-            } else {
-                chdir(dirname($_SERVER['SCRIPT_FILENAME']));
-            }
-            return static::send(static::$config['auto-index-file']);
-        } elseif (static::$config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
-            return static::error(404);
-        }
-        return static::send();
+
+        return $this->error(403);
     }
 
     /**
@@ -258,13 +303,13 @@ class PhpRouter
      * @param bool $read
      * @return bool|string
      */
-    protected static function send($file = '', $read = false)
+    protected function send($file = '', $read = false)
     {
-        static::logAccess('200');
+        $this->logAccess('200');
         if ('' === $file) {
             return false;
         } elseif ($read) {
-            readfile(static::$scriptFilename);
+            readfile($this->scriptFilename);
             exit;
         }
         return $file;
@@ -273,7 +318,7 @@ class PhpRouter
     /**
      * @return array
      */
-    protected static function getSupportedMime()
+    protected function getSupportedMime()
     {
         $mime = ['html'];
 
@@ -306,7 +351,7 @@ class PhpRouter
      *
      * @return array
      */
-    protected static function getMimeTypes()
+    protected function getMimeTypes()
     {
         return [
             'hqx' => 'application/mac-binhex40',
@@ -412,9 +457,11 @@ class PhpRouter
      * @param string $message
      * @return bool
      */
-    protected static function error($error = 500, $message = '')
+    protected function error($error = 500, $message = '', $log = true)
     {
-        static::logAccess($error);
+        if ($log) {
+            $this->logAccess($error);
+        }
 
         if (403 === $error) {
             $status = 'Forbidden';
@@ -424,22 +471,25 @@ class PhpRouter
         } elseif (404 === $error) {
             $status = 'Not Found';
             if ('' === $message) {
-                $message = sprintf('The requested resource <strong>%4$s</strong> was Not Found on this server.', $_SERVER['REQUEST_URI']);
+                $message = sprintf('The requested resource <strong>%s</strong> was Not Found on this server.', $_SERVER['REQUEST_URI']);
             }
         } else {
             $status = 'Internal server error';
         }
-
         header(sprintf("HTTP/1.0 %d %s", $error, $status));
+        $page = sprintf('<!doctype html><html><head><title>%s %s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%s</h1><p>%s</p><hr /><p>%s %s</p></body></html>', $error, $status, strtolower($status), $message, static::VENDOR_NAME, static::VERSION);
 
-        echo sprintf('<!doctype html><html><head><title>%s %s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%s</h1><p>%s</p><hr /><p>%s %s</p></body></html>', $error, $status, strtolower($status), $message, static::VENDOR_NAME, static::VERSION);
-        exit;
+        $fp = fopen("php://memory", 'w');
+        file_put_contents('php://memory', $page);
+        fputs($fp, $page);
+        rewind($fp);
+        return $fp;
     }
 
     /**
      * @param int $status
      */
-    protected static function logAccess($status = 200)
+    protected function logAccess($status = 200)
     {
 
         if ($status >= 500) {
@@ -452,28 +502,25 @@ class PhpRouter
             $color = 32;// green
         }
 
-        if (static::$config['log'] || static::$config['log-dir']) {
+        if ($this->config['log'] || $this->config['logs-dir']) {
             $now = new \DateTime('now', new \DateTimeZone('UTC'));
             $coloredLog = sprintf("[%s] \033[%dm%s:%s [%s]: %s\033[0m\n", $now->format("D M j H:i:s Y"), $color, $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $status, $_SERVER["REQUEST_URI"]);
             $log = sprintf("[%s] %s:%s [%s]: %s\n", $now->format("D M j H:i:s Y"), $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $status, $_SERVER["REQUEST_URI"]);
-            if (static::$config['log']) {
-                file_put_contents("php://stdout", static::hasColorSupport() ? $coloredLog : $log);
+            if ($this->config['log']) {
+                file_put_contents($this->output, $this->hasColorSupport() ? $coloredLog : $log);
             }
-            if (!is_null(static::$config['log-dir'])) {
-                $filename = sprintf('%s%srouter-access-%s.log', static::$config['log-dir'], DIRECTORY_SEPARATOR, static::$host);
+            if (!is_null($this->config['logs-dir'])) {
+                $filename = sprintf('%s%srouter-access-%s.log', $this->config['logs-dir'], DIRECTORY_SEPARATOR, $this->host);
                 error_log($log, 3, $filename);
             }
         }
     }
 
     /**
-     *
-     *
      * @return bool
      */
-    protected static function hasColorSupport()
+    protected function hasColorSupport()
     {
-
         if (!ini_get('cli_server.color')) {
             return false;
         }
