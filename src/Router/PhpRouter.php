@@ -235,13 +235,15 @@ class PhpRouter
     {
         if (in_array($this->extension, $this->getSupportedMime()) && is_null($this->config['allow-origin']) && null === $this->config['cache-control'] && file_exists($this->originalScriptFilename)) {
             return $this->send();
-        } elseif (array_key_exists($this->extension, $this->getMimeTypes()) && file_exists($this->scriptFilename)) {
-            $types = $this->getMimeTypes()[$this->extension];
-            if (!is_array($types)) {
-                $types = [$types];
-            }
-            foreach ($types as $type) {
-                header(sprintf('Content-type: %s', $type));
+        } elseif (file_exists($this->scriptFilename)) {
+            if (array_key_exists($this->extension, $this->getMimeTypes())) {
+                $types = $this->getMimeTypes()[$this->extension];
+                if (!is_array($types)) {
+                    $types = [$types];
+                }
+                foreach ($types as $type) {
+                    header(sprintf('Content-type: %s', $type));
+                }
             }
             if (!is_null($this->config['allow-origin'])) {
                 foreach ($this->config['allow-origin'] as $origin) {
@@ -354,6 +356,7 @@ class PhpRouter
     protected function getMimeTypes()
     {
         return [
+            'ico' => 'image/x-icon',
             'hqx' => 'application/mac-binhex40',
             'cpt' => 'application/mac-compactpro',
             'csv' => array('text/x-comma-separated-values', 'text/comma-separated-values', 'application/octet-stream', 'application/vnd.ms-excel', 'text/csv', 'application/csv', 'application/excel', 'application/vnd.msexcel'),
