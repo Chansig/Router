@@ -507,8 +507,8 @@ class PhpRouter
 
         if ($this->config['log'] || $this->config['logs-dir']) {
             $now = new \DateTime('now', new \DateTimeZone('UTC'));
-            $coloredLog = sprintf("[%s] \033[%dm%s:%s [%s]: %s\033[0m\n", $now->format("D M j H:i:s Y"), $color, $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $status, $_SERVER["REQUEST_URI"]);
-            $log = sprintf("[%s] %s:%s [%s]: %s\n", $now->format("D M j H:i:s Y"), $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $status, $_SERVER["REQUEST_URI"]);
+            $coloredLog = sprintf("[%s] \033[%dm%s:%s [%s] [%s]: %s\033[0m\n", $now->format("D M j H:i:s Y"), $color, $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $this->host, $status, $_SERVER["REQUEST_URI"]);
+            $log = sprintf("[%s] %s:%s [%s] [%s]: %s\n", $now->format("D M j H:i:s Y"), $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $this->host, $status, $_SERVER["REQUEST_URI"]);
             if ($this->config['log']) {
                 file_put_contents($this->output, $this->hasColorSupport() ? $coloredLog : $log);
             }
