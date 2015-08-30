@@ -10,24 +10,28 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.6.0';
+    const VERSION = '0.6.1';
     /**
      * @var array
      */
-    protected $config = [
+    protected static $defaultConfig = [
         "hosts-name" => [],
         "docroot" => null,
         "directory-index" => ["index.php", "index.html"],
         "rewrite-index" => null,
         "allow-origin" => null,
         "handle-404" => false,
-        "cache-control" => 0,
+        "cache-control" => null,
         "log" => true,
         "logs-dir" => null,
         "vhosts" => [],
         "auto-index-file" => null,
     ];
 
+    /**
+     * @var array
+     */
+    protected $config = [];
     /**
      * @var string
      */
@@ -66,7 +70,7 @@ class PhpRouter
     /**
      * @var string
      */
-    protected $originalConfig;
+    protected static $originalConfigFile;
 
     /**
      * @var string
@@ -78,18 +82,37 @@ class PhpRouter
      */
     public function __construct($configFile = '')
     {
+        $this->config = static::$defaultConfig;
+
         $config = [];
         if (is_array($configFile)) {
             $config = $configFile;
         } elseif (is_string($configFile) && !empty($configFile) && file_exists($configFile)) {
             $config = json_decode(file_get_contents($configFile), true);
-        } elseif (is_string($configFile) && !empty($configFile)) {
+            static::$originalConfigFile = $configFile;
+        } elseif (is_string($configFile) && !empty($configFile) && !file_exists($configFile)) {
             $this->error(500, 'config file does not exist');
         }
         if (!empty($config)) {
             $this->configure($config);
         }
         $this->initFromGlobals();
+    }
+
+    /**
+     * @return array
+     */
+    public static function getDefaultConfig()
+    {
+        return static::$defaultConfig;
+    }
+
+    /**
+     * @return string
+     */
+    public static function getOriginalConfigFile()
+    {
+        return static::$originalConfigFile;
     }
 
     /**
@@ -308,7 +331,6 @@ class PhpRouter
                 return $this->send($_SERVER['SCRIPT_FILENAME']);
             }
         }
-
 
         return $this->error(403);
     }
@@ -547,4 +569,5 @@ class PhpRouter
 
         return function_exists('posix_isatty') && @posix_isatty(STDOUT);
     }
+
 }
