@@ -10,7 +10,7 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.5.0';
+    const VERSION = '0.6.0';
     /**
      * @var array
      */
@@ -66,13 +66,26 @@ class PhpRouter
     /**
      * @var string
      */
+    protected $originalConfig;
+
+    /**
+     * @var string
+     */
     public $output = 'php://stdout';
 
     /**
-     * @param array $config
+     * @param string $configFile
      */
-    public function __construct(array $config = [])
+    public function __construct($configFile = '')
     {
+        $config = [];
+        if (is_array($configFile)) {
+            $config = $configFile;
+        } elseif (is_string($configFile) && !empty($configFile) && file_exists($configFile)) {
+            $config = json_decode(file_get_contents($configFile), true);
+        } elseif (is_string($configFile) && !empty($configFile)) {
+            $this->error(500, 'config file does not exist');
+        }
         if (!empty($config)) {
             $this->configure($config);
         }

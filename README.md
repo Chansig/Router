@@ -248,6 +248,10 @@ For exemple, sf2 site on windows:
 
         $config = json_decode(file_get_contents(__DIR__ . '/router.json'), true);
         $router = new PhpRouter($config);
+        
+        or
+        
+        $router = new PhpRouter(__DIR__ . '/router.json');
 
 - run server
 

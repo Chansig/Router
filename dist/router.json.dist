@@ -1,0 +1,16 @@
+{
+    "docroot":null,
+    "directory-index": [
+        "index.php",
+        "index.html"
+    ],
+    "rewrite-index": null,
+    "hosts-name": [],
+    "allow-origin": null,
+    "handle-404": false,
+    "cache-control": null,
+    "log": true,
+    "logs-dir": null,
+    "auto-index-file":  null,
+    "vhosts": {}
+}
