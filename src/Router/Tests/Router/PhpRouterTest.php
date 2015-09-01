@@ -11,12 +11,13 @@ class PhpRouterTest extends \PHPUnit_Framework_TestCase
 
     protected $config = [
         "hosts-name" => [],
+        "port" => null,
         "docroot" => null,
         "directory-index" => ["index.php", "index.html"],
         "rewrite-index" => null,
         "allow-origin" => null,
         "handle-404" => false,
-        "cache-control" => 0,
+        "cache-control" => null,
         "log" => true,
         "logs-dir" => null,
         "vhosts" => [],
@@ -46,6 +47,7 @@ class PhpRouterTest extends \PHPUnit_Framework_TestCase
     {
         $config = [
             "hosts-name" => ['www.foo.bar', 'www.bar.foo'],
+            "port" => null,
             "docroot" => null,
             "directory-index" => ['foo.bar', 'bar.foo'],
             "rewrite-index" => ['bar.foo.bar'],

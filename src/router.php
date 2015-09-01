@@ -12,9 +12,10 @@ if ($prepend = $router->prepend()) {
 
 if (is_bool($result = $router->run())) {
     return $result;
-} elseif (is_resource($result) && 'stream' === get_resource_type($result)) {
-    echo stream_get_contents($result);
-    fclose($result);
+} elseif (is_array($result)) {
+    foreach ($result as $file) {
+        include($file);
+    }
 } else {
-    include($result);
+    echo $result;
 }

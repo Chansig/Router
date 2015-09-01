@@ -31,7 +31,6 @@ class ScriptHandler
     public static function install(Event $event)
     {
         static::createFiles($event, static::$override);
-        static::installed($event);
     }
 
     /**
@@ -96,7 +95,7 @@ class ScriptHandler
      * @param Event $event
      * @return string
      */
-    private static function getRouterFile(Event $event)
+    public static function getRouterFile(Event $event)
     {
         $extras = $event->getComposer()->getPackage()->getExtra();
         if (isset($extras['chansig-router-parameters'])) {
@@ -129,7 +128,7 @@ class ScriptHandler
      * @param Event $event
      * @return string
      */
-    private static function getConfigFile(Event $event)
+    public static function getConfigFile(Event $event)
     {
         $extras = $event->getComposer()->getPackage()->getExtra();
         if (isset($extras['chansig-router-parameters'])) {
@@ -160,10 +159,10 @@ class ScriptHandler
     /**
      * @param Event $event
      */
-    private static function installed(Event $event)
+    public static function installed(Event $event)
     {
         $event->getIO()->write(sprintf('
-
+______                   _         _
 | ___ \                 | |       | |
 | |_/ /  ___   __ _   __| | _   _ | |
 |    /  / _ \ / _` | / _` || | | || |
@@ -171,8 +170,8 @@ class ScriptHandler
 \_| \_| \___| \__,_| \__,_| \__, |(_)
                              __/ |
                             |___/
-Run now "php -S 127.0.0.1:80 router.php"
-To admin the server, edit %s', static::$configFile));
+
+Run now "php -S 127.0.0.1:80 router.php. To add vhosts, edit %s', static::$configFile));
     }
 
 }

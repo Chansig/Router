@@ -10,12 +10,13 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.6.1';
+    const VERSION = '0.6.2';
     /**
      * @var array
      */
     protected static $defaultConfig = [
         "hosts-name" => [],
+        "port" => null,
         "docroot" => null,
         "directory-index" => ["index.php", "index.html"],
         "rewrite-index" => null,
@@ -121,7 +122,9 @@ class PhpRouter
     protected function configure($config)
     {
         $this->config = array_merge($this->config, $config);
-        $this->configureVhosts();
+        if (!$this->configureVhosts()) {
+            return $this->error(404);
+        }
         if (!is_null($this->config['docroot']) && !is_dir($this->config['docroot'])) {
             throw new \InvalidArgumentException(sprintf('%s is not a valid docroot directory. Check your configuration syntax.', $this->config['docroot']));
         }
@@ -142,11 +145,7 @@ class PhpRouter
         $this->extension = pathinfo($path, PATHINFO_EXTENSION);
         $this->originaDocRoot = $_SERVER['DOCUMENT_ROOT'];
         $this->host = $exp[0];
-        if (isset($exp[1])) {
-            $this->port = $exp[1];
-        } else {
-            $this->port = 80;
-        }
+        $this->port = $this->getCurrentPort();
         if (!is_null($this->config['docroot'])) {
             $this->docroot = $this->config['docroot'];
         } else {
@@ -160,12 +159,21 @@ class PhpRouter
     }
 
     /**
+     * @return int
+     */
+    protected function getCurrentPort()
+    {
+        $exp = explode(':', $_SERVER['HTTP_HOST']);
+        return isset($exp[1]) ? (int)$exp[1] : 80;
+    }
+
+    /**
      * @return bool|string
      */
     public function prepend()
     {
         if (ini_get('auto_prepend_file') && !in_array(realpath(ini_get('auto_prepend_file')), get_included_files(), true)) {
-            return ini_get('auto_prepend_file');
+            return array(ini_get('auto_prepend_file'));
         }
         return false;
     }
@@ -176,7 +184,7 @@ class PhpRouter
     public function append()
     {
         if (ini_get('auto_append_file') && !in_array(realpath(ini_get('auto_append_file')), get_included_files(), true)) {
-            return ini_get('auto_append_file');
+            return array(ini_get('auto_append_file'));
         }
         return false;
     }
@@ -195,7 +203,7 @@ class PhpRouter
         if (is_file($this->scriptFilename)) {
             if ('php' === $this->extension) {
                 chdir(dirname($this->scriptFilename));
-                return $this->scriptFilename;
+                return array($this->scriptFilename);
             }
             return $this->executeFile();
         } elseif (is_null($this->config['rewrite-index']) && is_dir($this->scriptFilename)) {
@@ -218,9 +226,12 @@ class PhpRouter
         if (!empty($this->config['vhosts'])) {
             foreach ($this->config['vhosts'] as $vhost) {
                 if (in_array($this->host, $vhost['hosts-name'])) {
+                    if (isset($vhost['port']) && !is_null($vhost['port']) && $vhost['port'] != $this->getCurrentPort()) {
+                        return false;
+                    }
                     $this->config = array_merge($this->config, $vhost);
                     unset($this->config['vhosts']);
-                    break;
+                    return true;
                 } else {
                     foreach ($vhost['hosts-name'] as $host) {
                         $pattern = "@" . $host . "@";
@@ -234,15 +245,22 @@ class PhpRouter
                                     $vhost['logs-dir'] = str_replace('$' . $i, $matches[$i], $vhost['logs-dir']);
                                 }
                             }
+                            if (isset($vhost['port']) && !is_null($vhost['port']) && $vhost['port'] != $this->getCurrentPort()) {
+                                return false;
+                            }
                             $this->config = array_merge($this->config, $vhost);
-                            break;
+                            return true;
                         }
                     }
                 }
             }
         }
+        return true;
     }
 
+    /**
+     *
+     */
     protected function  setGlobals()
     {
         $_SERVER['DOCUMENT_ROOT'] = $this->docroot;
@@ -343,13 +361,15 @@ class PhpRouter
     protected function send($file = '', $read = false)
     {
         $this->logAccess('200');
+        header('HTTP/1.0 200 OK');
+
         if ('' === $file) {
             return false;
         } elseif ($read) {
             readfile($this->scriptFilename);
             exit;
         }
-        return $file;
+        return array($file);
     }
 
     /**
@@ -500,7 +520,6 @@ class PhpRouter
         if ($log) {
             $this->logAccess($error);
         }
-
         if (403 === $error) {
             $status = 'Forbidden';
             if ('' === $message) {
@@ -516,12 +535,7 @@ class PhpRouter
         }
         header(sprintf("HTTP/1.0 %d %s", $error, $status));
         $page = sprintf('<!doctype html><html><head><title>%s %s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%s</h1><p>%s</p><hr /><p>%s %s</p></body></html>', $error, $status, strtolower($status), $message, static::VENDOR_NAME, static::VERSION);
-
-        $fp = fopen("php://memory", 'w');
-        file_put_contents('php://memory', $page);
-        fputs($fp, $page);
-        rewind($fp);
-        return $fp;
+        die($page);
     }
 
     /**

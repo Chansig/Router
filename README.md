@@ -92,6 +92,12 @@ Set configuration values in router.json:
 -   "hosts-name"  
     @var string[] ***[]***  
     List of allowed hosts if not empty.    
+        
+
+-   "port"  
+    @var null|int ***null***  
+    Which tcp/ip port does the server run on.
+    Default null for all ports
   
   
 -   "docroot"  
@@ -174,6 +180,7 @@ Set configuration values in router.json:
         #router.json
         {
             "hosts-name":  [],
+            "port": null,
             "docroot": null,
             "directory-index": ["index.php"],
             "rewrite-index": null,
@@ -193,6 +200,7 @@ Set configuration values in router.json:
                 },
                 "serverkey1": {
                     "hosts-name": ["cdn.dev.mysite.ltd""],
+                    "port": 8080,
                     "docroot": "/var/www/www.mysite.tld",
                     "directory-index": ["index.html", "mydirectoryindex.php"],
                     "allow-origin": null,

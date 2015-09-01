@@ -1,5 +1,6 @@
 {
     "hosts-name": [],
+    "port": null,
     "docroot": null,
     "directory-index": [
         "index.php",
@@ -32,6 +33,7 @@
             "hosts-name": [
                 "dev.cdn.www.([a-z]+).([a-z]+)"
             ],
+            "port": 8080,
             "docroot": "/var/www/www.$1.$2/web",
             "directory-index": [
                 "app_dev.php"

@@ -1,5 +1,6 @@
 {
-    "docroot":null,
+    "docroot": null,
+    "port": null,
     "directory-index": [
         "index.php",
         "index.html"
@@ -11,6 +12,6 @@
     "cache-control": null,
     "log": true,
     "logs-dir": null,
-    "auto-index-file":  null,
+    "auto-index-file": null,
     "vhosts": {}
 }
