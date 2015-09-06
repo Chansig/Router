@@ -10,7 +10,7 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.6.2';
+    const VERSION = '0.7.0';
     /**
      * @var array
      */
@@ -27,6 +27,8 @@ class PhpRouter
         "logs-dir" => null,
         "vhosts" => [],
         "auto-index-file" => null,
+        "render-ssi" => null,
+        "ext-ssi" => ['shtml', 'html', 'htm'],
     ];
 
     /**
@@ -84,7 +86,6 @@ class PhpRouter
     public function __construct($configFile = '')
     {
         $this->config = static::$defaultConfig;
-
         $config = [];
         if (is_array($configFile)) {
             $config = $configFile;
@@ -118,12 +119,13 @@ class PhpRouter
 
     /**
      * @param $config
+     * @return bool
      */
     protected function configure($config)
     {
         $this->config = array_merge($this->config, $config);
         if (!$this->configureVhosts()) {
-            return $this->error(404);
+            $this->error(404);
         }
         if (!is_null($this->config['docroot']) && !is_dir($this->config['docroot'])) {
             throw new \InvalidArgumentException(sprintf('%s is not a valid docroot directory. Check your configuration syntax.', $this->config['docroot']));
@@ -173,7 +175,7 @@ class PhpRouter
     public function prepend()
     {
         if (ini_get('auto_prepend_file') && !in_array(realpath(ini_get('auto_prepend_file')), get_included_files(), true)) {
-            return array(ini_get('auto_prepend_file'));
+            return ini_get('auto_prepend_file');
         }
         return false;
     }
@@ -184,18 +186,18 @@ class PhpRouter
     public function append()
     {
         if (ini_get('auto_append_file') && !in_array(realpath(ini_get('auto_append_file')), get_included_files(), true)) {
-            return array(ini_get('auto_append_file'));
+            return ini_get('auto_append_file');
         }
         return false;
     }
 
     /**
-     * @return bool
+     * @return array|bool|string
      */
     public function run()
     {
         if (!$this->IsAuthorized()) {
-            return $this->error(403);
+            $this->error(403);
         }
 
         header(sprintf('X-Router: %s %s', static::VENDOR_NAME, static::VERSION));
@@ -205,13 +207,13 @@ class PhpRouter
                 chdir(dirname($this->scriptFilename));
                 return array($this->scriptFilename);
             }
-            return $this->executeFile();
+            return $this->readFile();
         } elseif (is_null($this->config['rewrite-index']) && is_dir($this->scriptFilename)) {
             return $this->executeDirectory();
         } elseif (!is_null($this->config['rewrite-index'])) {
             return $this->executeRewrite();
         } else {
-            return $this->error(404);
+            $this->error(404);
         }
     }
 
@@ -285,7 +287,7 @@ class PhpRouter
     /**
      * @return bool|string
      */
-    protected function executeFile()
+    protected function readFile()
     {
         if (in_array($this->extension, $this->getSupportedMime()) && is_null($this->config['allow-origin']) && null === $this->config['cache-control'] && file_exists($this->originalScriptFilename)) {
             return $this->send();
@@ -307,7 +309,7 @@ class PhpRouter
             if (!is_null($this->config['cache-control'])) {
                 header(sprintf('Cache-Control: public, max-age=%1$d', $this->config['cache-control']));
             }
-            return $this->send($this->scriptFilename, true);
+            return $this->send($this->scriptFilename);
         }
         return $this->send();
     }
@@ -322,6 +324,7 @@ class PhpRouter
         foreach ($this->config['directory-index'] as $index) {
             // directory-index (index.php or index.html) exists in directory
             if (file_exists($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index)) {
+                chdir(dirname($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index));
                 $_SERVER['SCRIPT_FILENAME'] = $_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index;
                 return $this->send($_SERVER['SCRIPT_FILENAME']);
             }
@@ -329,12 +332,13 @@ class PhpRouter
 
         // auto-index-file has been set in router.json. @ see chansig/directory
         if ($this->config['auto-index-file'] && file_exists($this->config['auto-index-file'])) {
+            chdir(dirname($this->config['auto-index-file']));
             return $this->send($this->config['auto-index-file']);
         } elseif ($this->config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
-            return $this->error(404);
+            $this->error(404);
         }
 
-        return $this->error(403);
+        $this->error(403);
     }
 
     /**
@@ -345,12 +349,14 @@ class PhpRouter
         foreach ($this->config['rewrite-index'] as $index) {
             // rewrite-index router exists (app.php) exist in docroot
             if (file_exists($this->docroot . DIRECTORY_SEPARATOR . $index)) {
+                chdir(dirname($this->docroot . DIRECTORY_SEPARATOR . $index));
                 $_SERVER['SCRIPT_FILENAME'] = $this->docroot . DIRECTORY_SEPARATOR . $index;
+                $_SERVER['SCRIPT_NAME'] = "/" . $index;
                 return $this->send($_SERVER['SCRIPT_FILENAME']);
             }
         }
 
-        return $this->error(403);
+        $this->error(403);
     }
 
     /**
@@ -364,13 +370,80 @@ class PhpRouter
         header('HTTP/1.0 200 OK');
 
         if ('' === $file) {
+            if ($this->hasSSI($this->scriptFilename)) {
+                return $this->renderSSI(@file_get_contents($this->scriptFilename));
+            }
             return false;
-        } elseif ($read) {
-            readfile($this->scriptFilename);
-            exit;
+        } else {
+            if ($this->hasSSI($file)) {
+                return $this->renderSSI(@file_get_contents($file));
+            }
+            return [$file];
         }
-        return array($file);
+
     }
+
+    /**
+     * @param $file
+     * @return bool
+     */
+    public function hasSSI($file)
+    {
+        if (file_exists($file)) {
+            $extension = pathinfo($file, PATHINFO_EXTENSION);
+            return $this->config['render-ssi'] && is_array($this->config['ext-ssi']) && in_array($extension, $this->config['ext-ssi']);
+        }
+        return false;
+    }
+
+    /**
+     * @param $content
+     * @return mixed
+     */
+    protected function renderSSI($content)
+    {
+        try {
+            $pattern = '/<!--([\s\t]?)#include([\s\t]?)virtual="([^"]*)"([\s\t]?)-->/sU';
+            $content = preg_replace_callback($pattern, array($this, 'replaceVirtual'), $content);
+            $content = $this->includeExpr($content);
+
+            $pattern = '/<!--([\s\t]?)#include([\s\t]?)file="([^"]*)"([\s\t]?)-->/sU';
+            $content = preg_replace_callback($pattern, array($this, 'replaceFile'), $content);
+            $content = $this->includeExpr($content);
+
+            return $content;
+        } catch (\Exception $e) {
+            $this->error(500, $e->getMessage());
+        }
+    }
+
+    protected function replaceFile($url)
+    {
+        return $this->renderSSI(@file_get_contents(getcwd() . DIRECTORY_SEPARATOR . $url[3]));
+    }
+
+    protected function replaceVirtual($url)
+    {
+        return $this->renderSSI(@file_get_contents($this->docroot . DIRECTORY_SEPARATOR . $url[3]));
+    }
+
+    /**
+     * remove #if expr
+     *
+     * @param $content
+     * @return mixed
+     */
+    protected function includeExpr($content)
+    {
+        try {
+            $pattern = '/<!--#if([\s\t]?)expr="([^"]*)"([\s\t]?)-->([^"]*)<!--#endif-->/sU';
+            $content = preg_replace($pattern, '', $content);
+            return $content;
+        } catch (\Exception $e) {
+            $this->error(500);
+        }
+    }
+
 
     /**
      * @return array
@@ -414,7 +487,7 @@ class PhpRouter
             'ico' => 'image/x-icon',
             'hqx' => 'application/mac-binhex40',
             'cpt' => 'application/mac-compactpro',
-            'csv' => array('text/x-comma-separated-values', 'text/comma-separated-values', 'application/octet-stream', 'application/vnd.ms-excel', 'text/csv', 'application/csv', 'application/excel', 'application/vnd.msexcel'),
+            'csv' => ['text/x-comma-separated-values', 'text/comma-separated-values', 'application/octet-stream', 'application/vnd.ms-excel', 'text/csv', 'application/csv', 'application/excel', 'application/vnd.msexcel'],
             'bin' => 'application/macbinary',
             'dms' => 'application/octet-stream',
             'lha' => 'application/octet-stream',
@@ -426,15 +499,15 @@ class PhpRouter
             'sea' => 'application/octet-stream',
             'dll' => 'application/octet-stream',
             'oda' => 'application/oda',
-            'pdf' => array('application/pdf', 'application/x-download'),
+            'pdf' => ['application/pdf', 'application/x-download'],
             'ai' => 'application/postscript',
             'eps' => 'application/postscript',
             'ps' => 'application/postscript',
             'smi' => 'application/smil',
             'smil' => 'application/smil',
             'mif' => 'application/vnd.mif',
-            'xls' => array('application/excel', 'application/vnd.ms-excel', 'application/msexcel'),
-            'ppt' => array('application/powerpoint', 'application/vnd.ms-powerpoint'),
+            'xls' => ['application/excel', 'application/vnd.ms-excel', 'application/msexcel'],
+            'ppt' => ['application/powerpoint', 'application/vnd.ms-powerpoint'],
             'wbxml' => 'application/wbxml',
             'wmlc' => 'application/wmlc',
             'dcr' => 'application/x-director',
@@ -455,12 +528,12 @@ class PhpRouter
             'tgz' => 'application/x-tar',
             'xhtml' => 'application/xhtml+xml',
             'xht' => 'application/xhtml+xml',
-            'zip' => array('application/x-zip', 'application/zip', 'application/x-zip-compressed'),
+            'zip' => ['application/x-zip', 'application/zip', 'application/x-zip-compressed'],
             'mid' => 'audio/midi',
             'midi' => 'audio/midi',
             'mpga' => 'audio/mpeg',
             'mp2' => 'audio/mpeg',
-            'mp3' => array('audio/mpeg', 'audio/mpg'),
+            'mp3' => ['audio/mpeg', 'audio/mpg'],
             'aif' => 'audio/x-aiff',
             'aiff' => 'audio/x-aiff',
             'aifc' => 'audio/x-aiff',
@@ -472,10 +545,10 @@ class PhpRouter
             'wav' => 'audio/x-wav',
             'bmp' => 'image/bmp',
             'gif' => 'image/gif',
-            'jpeg' => array('image/jpeg', 'image/pjpeg'),
-            'jpg' => array('image/jpeg', 'image/pjpeg'),
-            'jpe' => array('image/jpeg', 'image/pjpeg'),
-            'png' => array('image/png', 'image/x-png'),
+            'jpeg' => ['image/jpeg', 'image/pjpeg'],
+            'jpg' => ['image/jpeg', 'image/pjpeg'],
+            'jpe' => ['image/jpeg', 'image/pjpeg'],
+            'png' => ['image/png', 'image/x-png'],
             'tiff' => 'image/tiff',
             'tif' => 'image/tiff',
             'css' => 'text/css',
@@ -484,7 +557,7 @@ class PhpRouter
             'shtml' => 'text/html',
             'txt' => 'text/plain',
             'text' => 'text/plain',
-            'log' => array('text/plain', 'text/x-log'),
+            'log' => ['text/plain', 'text/x-log'],
             'rtx' => 'text/richtext',
             'rtf' => 'text/rtf',
             'xml' => 'text/xml',
@@ -499,7 +572,7 @@ class PhpRouter
             'doc' => 'application/msword',
             'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'word' => array('application/msword', 'application/octet-stream'),
+            'word' => ['application/msword', 'application/octet-stream'],
             'xl' => 'application/excel',
             'eml' => 'message/rfc822',
             'eot' => 'application/vnd.ms-fontobject',
@@ -513,29 +586,33 @@ class PhpRouter
     /**
      * @param int $error
      * @param string $message
-     * @return bool
+     * @param bool|true $log
      */
-    protected function error($error = 500, $message = '', $log = true)
+    protected function error($error = 500, $message = '')
     {
-        if ($log) {
-            $this->logAccess($error);
-        }
+        $this->logAccess($error);
+
         if (403 === $error) {
-            $status = 'Forbidden';
             if ('' === $message) {
                 $message = sprintf('Access Forbidden for the requested resource <strong>%s</strong> on this server.', $_SERVER['REQUEST_URI']);
             }
         } elseif (404 === $error) {
-            $status = 'Not Found';
             if ('' === $message) {
                 $message = sprintf('The requested resource <strong>%s</strong> was Not Found on this server.', $_SERVER['REQUEST_URI']);
             }
         } else {
-            $status = 'Internal server error';
+            $error = 500;
         }
-        header(sprintf("HTTP/1.0 %d %s", $error, $status));
-        $page = sprintf('<!doctype html><html><head><title>%s %s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%s</h1><p>%s</p><hr /><p>%s %s</p></body></html>', $error, $status, strtolower($status), $message, static::VENDOR_NAME, static::VERSION);
-        die($page);
+
+        $status = [
+            '403' => 'Forbidden',
+            '404' => 'Not Found',
+            '500' => 'Internal server error',
+        ];
+
+        header(sprintf("HTTP/1.0 %d %s", $error, $status[$error]));
+
+        die(sprintf('<!doctype html><html><head><title>%s %s</title><style> * body { background-color: #ffffff; color: #000000; } * h1 { font-family: sans-serif; font-size: 150%%; background-color: #9999cc; font-weight: bold; color: #000000; margin-top: 0;} * </style></head><body><h1>%s</h1><p>%s</p><hr /><p>%s %s</p></body></html>', $error, $status[$error], strtolower($status[$error]), $message, static::VENDOR_NAME, static::VERSION));
     }
 
     /**
@@ -543,18 +620,18 @@ class PhpRouter
      */
     protected function logAccess($status = 200)
     {
-
-        if ($status >= 500) {
-            $color = 31;// red
-        } elseif ($status >= 400) {
-            $color = 33;// yellow
-        } elseif ($status >= 300) {
-            $color = 35;// pink
-        } else {
-            $color = 32;// green
-        }
-
         if ($this->config['log'] || $this->config['logs-dir']) {
+
+            if ($status >= 500) {
+                $color = 31;// red
+            } elseif ($status >= 400) {
+                $color = 33;// yellow
+            } elseif ($status >= 300) {
+                $color = 35;// pink
+            } else {
+                $color = 32;// green
+            }
+
             $now = new \DateTime('now', new \DateTimeZone('UTC'));
             $coloredLog = sprintf("[%s] \033[%dm%s:%s [%s] [%s]: %s\033[0m\n", $now->format("D M j H:i:s Y"), $color, $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $this->host, $status, $_SERVER["REQUEST_URI"]);
             $log = sprintf("[%s] %s:%s [%s] [%s]: %s\n", $now->format("D M j H:i:s Y"), $_SERVER["REMOTE_ADDR"], $_SERVER["REMOTE_PORT"], $this->host, $status, $_SERVER["REQUEST_URI"]);

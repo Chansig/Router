@@ -13,5 +13,10 @@
     "log": true,
     "logs-dir": null,
     "auto-index-file": null,
+    "ext-ssi": [
+            "shtml",
+            "html",
+            "htm"
+        ],
     "vhosts": {}
 }

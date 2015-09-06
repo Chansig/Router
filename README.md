@@ -3,12 +3,16 @@ Chansig/Router
 
 PHP Router for PHP5.4+ Built-in Server
 
+See http://php.net/manual/en/features.commandline.webserver.php
+
+
 Works on:
 
 - Wordpress
 - Symfony 2,
 - Laravel,
 - phpMyAdmin,
+- bolt,
 - etc.
 
 ## Features
@@ -141,6 +145,24 @@ Set configuration values in router.json:
             
             "cache-control": 86400
 
+-   "render-ssi"
+    @var bool   false
+    Render SSI include virtual & file.
+
+    e.g.
+            
+            "render-ssi": true
+
+
+-  "ext-ssi"
+    @var null|array ***["shtml", "html", "htm"]*** 
+    File extensions that contains an SSI directive.
+
+    e.g.
+            
+            "ext-ssi": ["shtml"]
+
+
 -   "log"  
     @var bool ***true***  
     Send access logs to output if true
@@ -218,7 +240,7 @@ Set configuration values in router.json:
     
         "hosts-name": ["dev.www.([a-z]+).([a-z]+)"],
                
-    They will be replaced in **docroot** and **logs-dir** values.  
+    They will be replaced in **docroot** and **logs-dir** values.
     
     e.g.  
      
@@ -265,9 +287,17 @@ For exemple, sf2 site on windows:
 
         php -S localhost:80 router.php
 
+        To find process:
+        ps -ef | grep router.php
+
 ## Warning
 
-On OSX, run  sudo php -S localhost:{port} router.php for port < 1024
+On OSX, run  sudo php -S 127.0.0.1:{port} router.php for port < 1024
+
+
+PHP Build In Server is single threaded. So you can not curl (or file_ge_content) to itself on same port. Run an other Server on a new Port to do it.
+
+e.g. php -S 127.0.0.1:80 for front and php -S 127.0.0.1:8000 for api
 
 ## License
 
