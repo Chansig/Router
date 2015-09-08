@@ -332,7 +332,6 @@ class PhpRouter
 
         // auto-index-file has been set in router.json. @ see chansig/directory
         if ($this->config['auto-index-file'] && file_exists($this->config['auto-index-file'])) {
-            chdir(dirname($this->config['auto-index-file']));
             return $this->send($this->config['auto-index-file']);
         } elseif ($this->config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
             $this->error(404);
