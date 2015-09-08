@@ -10,7 +10,7 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.7.0';
+    const VERSION = '0.7.1';
     /**
      * @var array
      */
