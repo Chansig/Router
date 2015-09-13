@@ -10,7 +10,7 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.7.1';
+    const VERSION = '0.7.2';
     /**
      * @var array
      */
@@ -309,7 +309,7 @@ class PhpRouter
             if (!is_null($this->config['cache-control'])) {
                 header(sprintf('Cache-Control: public, max-age=%1$d', $this->config['cache-control']));
             }
-            return $this->send($this->scriptFilename);
+            return $this->send($this->scriptFilename, true);
         }
         return $this->send();
     }
@@ -330,7 +330,7 @@ class PhpRouter
             }
         }
 
-        // auto-index-file has been set in router.json. @ see chansig/directory
+        // auto-index-file has been set in router.json. @see chansig/directory
         if ($this->config['auto-index-file'] && file_exists($this->config['auto-index-file'])) {
             return $this->send($this->config['auto-index-file']);
         } elseif ($this->config['handle-404'] && $_SERVER['SCRIPT_NAME'] !== '/') {
@@ -376,6 +376,9 @@ class PhpRouter
         } else {
             if ($this->hasSSI($file)) {
                 return $this->renderSSI(@file_get_contents($file));
+            } elseif ($read) {
+                readfile($this->scriptFilename);
+                die();
             }
             return [$file];
         }
