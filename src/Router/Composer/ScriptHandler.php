@@ -208,7 +208,7 @@ ______                   _         _
                              __/ |
                             |___/
 
-Run now "php -S 127.0.0.1:80 router.php. To add vhosts, edit %s', static::$configFile));
+Run now "php -S %s:%s %s. To add vhosts, edit %s', static::$serverHost, static::$serverPort, static::$routerFile, static::$configFile));
     }
 
 }
