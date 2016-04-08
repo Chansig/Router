@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+PHP=`which php`
+$PHP -S 127.0.0.1:8000 router.php

@@ -12,10 +12,16 @@ class ScriptHandler
 {
     const  ROUTER_FILE_NAME = 'router.php';
     const  CONFIG_FILE_NAME = 'router.json';
+    const  SERVER_FILE_NAME = 'server.sh';
+    const  SERVER_PORT = 8000;
+    const  SERVER_HOST = '127.0.0.1';
 
     private static $override = false;
     private static $routerFile = self::ROUTER_FILE_NAME;
     private static $configFile = self::CONFIG_FILE_NAME;
+    private static $serverFile = self::SERVER_FILE_NAME;
+    private static $serverPort = self::SERVER_PORT;
+    private static $serverHost = self::SERVER_HOST;
 
     /**
      * @param Event $event
@@ -57,6 +63,16 @@ class ScriptHandler
             $content = file_get_contents($routerFile);
             $content = str_replace(self::CONFIG_FILE_NAME, static::$configFile, $content);
             file_put_contents($routerFile, $content);
+        }
+
+        $serverFile = static::getServerFile($event);
+        $serverDistFile = static::getServerDistFile($event);
+        if (static::createFile($event, $serverDistFile, $serverFile, $override)) {
+            $content = file_get_contents($serverFile);
+            $content = str_replace(self::ROUTER_FILE_NAME, static::$routerFile, $content);
+            $content = str_replace(self::SERVER_PORT, static::$serverPort, $content);
+            $content = str_replace(self::SERVER_HOST, static::$serverHost, $content);
+            file_put_contents($serverFile, $content);
         }
     }
 
@@ -151,9 +167,41 @@ class ScriptHandler
      * @param Event $event
      * @return string
      */
+    private static function getServerFile(Event $event)
+    {
+        $extras = $event->getComposer()->getPackage()->getExtra();
+        if (isset($extras['chansig-router-parameters'])) {
+            $configs = $extras['chansig-router-parameters'];
+            if (!is_array($configs)) {
+                throw new \InvalidArgumentException('The extra.chansig-router-parameters setting must be an array.');
+            }
+            if (isset($configs['server-file'])) {
+                if (!is_string($configs['server-file'])) {
+                    throw new \InvalidArgumentException('The extra.chansig-router-parameters.server-file setting must be a string.');
+                }
+                static::$serverFile = $configs['server-file'];
+            }
+        }
+        $vendorDir = $event->getComposer()->getConfig()->get('vendor-dir');
+        return realpath(sprintf('%s/../', $vendorDir)) . DIRECTORY_SEPARATOR . static::$serverFile;
+    }
+
+    /**
+     * @param Event $event
+     * @return string
+     */
     private static function getConfigDistFile(Event $event)
     {
         return realpath(__DIR__ . '/../../../dist/router.json.dist');
+    }
+
+    /**
+     * @param Event $event
+     * @return string
+     */
+    private static function getServerDistFile(Event $event)
+    {
+        return realpath(__DIR__ . '/../../../dist/server.sh.dist');
     }
 
     /**
