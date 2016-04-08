@@ -10,7 +10,7 @@ namespace Chansig\Router;
 class PhpRouter
 {
     const VENDOR_NAME = 'chansig/router';
-    const VERSION = '0.7.2';
+    const VERSION = '0.7.3';
     /**
      * @var array
      */
@@ -123,6 +123,8 @@ class PhpRouter
      */
     protected function configure($config)
     {
+        $this->ignoreRootIndexFile();
+
         $this->config = array_merge($this->config, $config);
         if (!$this->configureVhosts()) {
             $this->error(404);
@@ -134,6 +136,18 @@ class PhpRouter
             throw new \InvalidArgumentException(sprintf('%s is not a valid logs directory. Check your configuration syntax.', $this->config['logs-dir']));
         }
 
+    }
+
+    protected function ignoreRootIndexFile()
+    {
+        $indexes = ['index.html', 'index.php'];
+        // index file in router dir
+        foreach ($indexes as $index) {
+            $index = '/' . $index;
+            if ($_SERVER['SCRIPT_NAME'] === $index && substr(parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH), -11) !== $index) {
+                $_SERVER['SCRIPT_NAME'] = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+            }
+        }
     }
 
     /**
@@ -153,9 +167,8 @@ class PhpRouter
         } else {
             $this->docroot = $this->originaDocRoot;
         }
-
-        $this->scriptFilename = $this->docroot . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
-        $this->originalScriptFilename = $this->originaDocRoot . str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']);
+        $this->scriptFilename = $this->docroot . ($_SERVER['SCRIPT_NAME'] != '/' ? str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']) : '');
+        $this->originalScriptFilename = $this->originaDocRoot . ($_SERVER['SCRIPT_NAME'] != '/' ? str_replace('/', DIRECTORY_SEPARATOR, $_SERVER['SCRIPT_NAME']) : '');
 
         $this->setGlobals();
     }
@@ -263,7 +276,7 @@ class PhpRouter
     /**
      *
      */
-    protected function  setGlobals()
+    protected function setGlobals()
     {
         $_SERVER['DOCUMENT_ROOT'] = $this->docroot;
         $_SERVER['SCRIPT_FILENAME'] = $this->scriptFilename;
@@ -324,7 +337,6 @@ class PhpRouter
         foreach ($this->config['directory-index'] as $index) {
             // directory-index (index.php or index.html) exists in directory
             if (file_exists($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index)) {
-                chdir(dirname($_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index));
                 $_SERVER['SCRIPT_FILENAME'] = $_SERVER['SCRIPT_FILENAME'] . DIRECTORY_SEPARATOR . $index;
                 return $this->send($_SERVER['SCRIPT_FILENAME']);
             }
