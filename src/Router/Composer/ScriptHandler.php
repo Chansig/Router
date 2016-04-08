@@ -13,10 +13,9 @@ class ScriptHandler
     const  ROUTER_FILE_NAME = 'router.php';
     const  CONFIG_FILE_NAME = 'router.json';
     const  SERVER_FILE_NAME = 'server.sh';
-    const  SERVER_PORT = 8000;
     const  SERVER_HOST = '127.0.0.1';
+    const  SERVER_PORT = 8000;
 
-    private static $override = false;
     private static $routerFile = self::ROUTER_FILE_NAME;
     private static $configFile = self::CONFIG_FILE_NAME;
     private static $serverFile = self::SERVER_FILE_NAME;
@@ -26,17 +25,9 @@ class ScriptHandler
     /**
      * @param Event $event
      */
-    public static function rootPackageInstall(Event $event)
-    {
-        static::$override = true;
-    }
-
-    /**
-     * @param Event $event
-     */
     public static function install(Event $event)
     {
-        static::createFiles($event, static::$override);
+        static::createFiles($event);
     }
 
     /**
@@ -49,17 +40,16 @@ class ScriptHandler
 
     /**
      * @param Event $event
-     * @param $override
      */
-    private static function createFiles(Event $event, $override)
+    private static function createFiles(Event $event)
     {
         $routerFile = static::getRouterFile($event);
         $routerDistFile = static::getRouterDistFile($event);
-        static::createFile($event, $routerDistFile, $routerFile, $override);
+        static::createFile($event, $routerDistFile, $routerFile);
 
         $configFile = static::getConfigFile($event);
         $configDistFile = static::getConfigDistFile($event);
-        if (static::createFile($event, $configDistFile, $configFile, $override)) {
+        if (static::createFile($event, $configDistFile, $configFile)) {
             $content = file_get_contents($routerFile);
             $content = str_replace(self::CONFIG_FILE_NAME, static::$configFile, $content);
             file_put_contents($routerFile, $content);
@@ -67,7 +57,7 @@ class ScriptHandler
 
         $serverFile = static::getServerFile($event);
         $serverDistFile = static::getServerDistFile($event);
-        if (static::createFile($event, $serverDistFile, $serverFile, $override)) {
+        if (static::createFile($event, $serverDistFile, $serverFile)) {
             $content = file_get_contents($serverFile);
             $content = str_replace(self::ROUTER_FILE_NAME, static::$routerFile, $content);
             $content = str_replace(self::SERVER_PORT, static::$serverPort, $content);
@@ -80,9 +70,8 @@ class ScriptHandler
      * @param Event $event
      * @param $source
      * @param $destination
-     * @param $override
      */
-    private static function createFile(Event $event, $source, $destination, $override)
+    private static function createFile(Event $event, $source, $destination)
     {
         if (!file_exists($destination)) {
             $question = sprintf('The file [%s] will be created. OK? (y)', $destination);
@@ -94,7 +83,7 @@ class ScriptHandler
             } else {
                 $event->getIO()->write(sprintf("<warning>[%s] has not been created.</warning>", $destination));
             }
-        } elseif ($override) {
+        } else {
             $question = sprintf('/!\ The file [%s] already exists. Override? (n)', $destination);
             $response = $event->getIO()->askConfirmation($question, false);
             if ($response) {
