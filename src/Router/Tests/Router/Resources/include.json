@@ -1,19 +1,4 @@
 {
-    "hosts-name": [],
-    "port": null,
-    "docroot": null,
-    "directory-index": [
-        "index.php",
-        "index.html"
-    ],
-    "rewrite-index" : null,
-    "allow-origin": null,
-    "handle-404": false,
-    "cache": null,
-    "log": true,
-    "logs-dir": null,
-    "include": [],
-    "auto-index-file": null,
     "vhosts": {
         "www": {
             "hosts-name": [
@@ -39,7 +24,9 @@
             "directory-index": [
                 "app_dev.php"
             ],
-            "allow-origin": ["*"],
+            "allow-origin": [
+                "*"
+            ],
             "handle-404": false,
             "cache": 86400,
             "log": true,

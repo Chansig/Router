@@ -248,6 +248,18 @@ Set configuration values in router.json:
         "logs-dir": "/var/log/php/www.$1.$2", 
 
 
+-   "include"  
+    @var null|array  ***[]***  
+    Include external config files.  
+    Don't override main config.  
+    
+    e.g.
+            
+            "include": [
+                "/Users/Toto/Sites/mysite.fr/router.json"
+            ]
+
+
 You can skip default configuration:  
 For exemple, sf2 site on windows:
 

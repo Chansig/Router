@@ -25,9 +25,10 @@ class PhpRouter
         "cache-control" => null,
         "log" => true,
         "logs-dir" => null,
+        "include" => [],
         "vhosts" => [],
         "auto-index-file" => null,
-        "render-ssi" => null,
+        "render-ssi" => false,
         "ext-ssi" => ['shtml', 'html', 'htm'],
     ];
 
@@ -124,8 +125,8 @@ class PhpRouter
     protected function configure($config)
     {
         $this->ignoreRootIndexFile();
-
         $this->config = array_merge($this->config, $config);
+        $this->includeExternalConfigs();
         if (!$this->configureVhosts()) {
             $this->error(404);
         }
@@ -138,6 +139,9 @@ class PhpRouter
 
     }
 
+    /**
+     *
+     */
     protected function ignoreRootIndexFile()
     {
         $indexes = ['index.html', 'index.php'];
@@ -146,6 +150,35 @@ class PhpRouter
             $index = '/' . $index;
             if ($_SERVER['SCRIPT_NAME'] === $index && substr(parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH), -11) !== $index) {
                 $_SERVER['SCRIPT_NAME'] = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+            }
+        }
+    }
+
+    /**
+     *
+     */
+    protected function includeExternalConfigs()
+    {
+        foreach ($this->config['include'] as $configFile) {
+            $config = @file_get_contents($configFile);
+            if (false !== $config) {
+                $config = json_decode($config, true);
+                if (is_null($config)) {
+                    throw new \InvalidArgumentException(sprintf('%s is not a valid json config file.', $configFile));
+                }
+                if ($config['vhosts']) {
+                    foreach ($config['vhosts'] as $host => $vhostConfig) {
+                        $keys = ['auto-index-file', 'docroot', 'logs-dir'];
+                        foreach ($keys as $key) {
+                            if (isset($vhostConfig[$key]) && substr($vhostConfig[$key], 0, 1) === '.') {
+                                $vhostConfig[$key] = dirname($configFile) . DIRECTORY_SEPARATOR . $vhostConfig[$key];
+                            }
+                        }
+                        $this->config['vhosts'][$host] = $vhostConfig;
+                    }
+                }
+            } else {
+                throw new \InvalidArgumentException(sprintf('File %s does not exist.', $configFile));
             }
         }
     }

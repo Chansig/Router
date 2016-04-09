@@ -6,7 +6,7 @@
         "index.php",
         "index.html"
     ],
-    "rewrite-index" : null,
+    "rewrite-index": null,
     "allow-origin": null,
     "handle-404": false,
     "cache": null,
@@ -14,6 +14,12 @@
     "logs-dir": null,
     "include": [],
     "auto-index-file": null,
+    "render-ssi": false,
+    "ext-ssi": [
+        "shtml",
+        "html",
+        "htm"
+    ],
     "vhosts": {
         "www": {
             "hosts-name": [
@@ -39,7 +45,9 @@
             "directory-index": [
                 "app_dev.php"
             ],
-            "allow-origin": ["*"],
+            "allow-origin": [
+                "*"
+            ],
             "handle-404": false,
             "cache": 86400,
             "log": true,
